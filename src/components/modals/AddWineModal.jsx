@@ -25,8 +25,8 @@ export default function AddWineModal({ pre = {}, onAdd, onClose }) {
       const q = form.vintage ? `${form.name} ${form.vintage}` : form.name
       const data = await callAI([{
         role: 'user',
-        content: `?�??"${q}"�?Vivino·Wine-Searcher?�서 검?�하�?JSON�?반환 (마크?�운 ?�이):
-{"producer":"?�산??,"region":"지??,"country":"�??","grape":"?�종","description":"?�국??2문장","imageUrl":"?��?지URL?�는빈문?�열","vivinoPrice":가격숫?�또?�null,"vivinoRating":?�점?�자?�는null,"wineSearcherPrice":750ml1병�?격숫?�또?�null}`,
+        content: `와인 "${q}"를 Vivino·Wine-Searcher에서 검색하고 JSON만 반환 (마크다운 없이):
+{"producer":"생산자","region":"지역","country":"국가","grape":"품종","description":"한국어 2문장","imageUrl":"이미지URL또는빈문자열","vivinoPrice":가격숫자또는null,"vivinoRating":평점숫자또는null,"wineSearcherPrice":750ml1병가격숫자또는null}`,
       }], 700, [{ type: 'web_search_20250305', name: 'web_search' }])
       const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
       const info = JSON.parse(text.replace(/```json|```/g, '').trim())
@@ -35,14 +35,14 @@ export default function AddWineModal({ pre = {}, onAdd, onClose }) {
       else setImgErr(true)
     } catch (e) {
       console.error(e)
-      if (e.message === 'API ???�음') alert('?�️ ?�정?�서 Claude API ?��? ?�력?�주?�요')
+      if (e.message === 'API 키 없음') alert('⚙️ 설정에서 Claude API 키를 입력해주세요')
       setImgErr(true)
     }
     setAiLoad(false); setImgSearching(false)
   }
 
   function submit() {
-    if (!form.name.trim()) { alert('?�???�름???�력?�세??); return }
+    if (!form.name.trim()) { alert('와인 이름을 입력하세요'); return }
     onAdd({
       ...form, ...(aiInfo || {}),
       id: uid(),
@@ -58,16 +58,16 @@ export default function AddWineModal({ pre = {}, onAdd, onClose }) {
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '1.4rem', color: T.cream }}>?�??추�?</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: T.muted, fontSize: '1.2rem' }}>??/button>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '1.4rem', color: T.cream }}>와인 추가</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: T.muted, fontSize: '1.2rem' }}>✕</button>
         </div>
 
         {/* Name + AI */}
         <div style={{ marginBottom: 12 }}>
-          <label style={lbl}>?�???�름 *</label>
+          <label style={lbl}>와인 이름 *</label>
           <div style={{ display: 'flex', gap: 8 }}>
             <input value={form.name} onChange={e => set('name', e.target.value)}
-              placeholder="?? Château Margaux" style={{ flex: 1 }}
+              placeholder="예: Château Margaux" style={{ flex: 1 }}
               onKeyDown={e => e.key === 'Enter' && runAI()} />
             <button onClick={runAI} disabled={aiLoad || !form.name.trim()} style={{
               background: aiLoad || !form.name.trim() ? T.muted : T.gold,
@@ -75,25 +75,25 @@ export default function AddWineModal({ pre = {}, onAdd, onClose }) {
               fontSize: '0.8rem', fontWeight: 600,
               cursor: aiLoad || !form.name.trim() ? 'not-allowed' : 'pointer',
               whiteSpace: 'nowrap', flexShrink: 0,
-            }}>{aiLoad ? '검??�?..' : '?�� AI 검??}</button>
+            }}>{aiLoad ? '검색 중...' : '🔍 AI 검색'}</button>
           </div>
         </div>
 
         {/* AI info */}
         {aiInfo && (
           <div style={{ background: T.surface, border: `1px solid ${T.gold}44`, borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
-            <div style={{ color: T.gold, fontWeight: 600, marginBottom: 8, fontSize: '0.8rem' }}>??AI ?�보</div>
+            <div style={{ color: T.gold, fontWeight: 600, marginBottom: 8, fontSize: '0.8rem' }}>✓ AI 정보</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', marginBottom: 8 }}>
-              {[['?�산??, aiInfo.producer], ['지??, aiInfo.region], ['�??', aiInfo.country], ['?�종', aiInfo.grape]].map(([k, v]) =>
+              {[['생산자', aiInfo.producer], ['지역', aiInfo.region], ['국가', aiInfo.country], ['품종', aiInfo.grape]].map(([k, v]) =>
                 v && <div key={k} style={{ fontSize: '0.78rem', color: T.text }}><span style={{ color: T.muted }}>{k}: </span>{v}</div>
               )}
             </div>
             {(aiInfo.vivinoPrice || aiInfo.wineSearcherPrice) && (
               <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.72rem', color: T.muted, textTransform: 'uppercase' }}>?�장가</span>
+                <span style={{ fontSize: '0.72rem', color: T.muted, textTransform: 'uppercase' }}>시장가</span>
                 {aiInfo.vivinoPrice && <span style={{ fontSize: '0.78rem' }}>Vivino <strong style={{ color: T.cream }}>${aiInfo.vivinoPrice}</strong></span>}
                 {aiInfo.wineSearcherPrice && <span style={{ fontSize: '0.78rem' }}>Wine-Searcher <strong style={{ color: T.cream }}>${aiInfo.wineSearcherPrice}</strong></span>}
-                {aiInfo.vivinoPrice && aiInfo.wineSearcherPrice && <span style={{ fontSize: '0.78rem', color: T.gold, fontWeight: 600 }}>?�균 ${Math.round((aiInfo.vivinoPrice + aiInfo.wineSearcherPrice) / 2)}</span>}
+                {aiInfo.vivinoPrice && aiInfo.wineSearcherPrice && <span style={{ fontSize: '0.78rem', color: T.gold, fontWeight: 600 }}>평균 ${Math.round((aiInfo.vivinoPrice + aiInfo.wineSearcherPrice) / 2)}</span>}
               </div>
             )}
             {aiInfo.description && <p style={{ color: T.text, fontStyle: 'italic', marginTop: 8, lineHeight: 1.5, fontSize: '0.78rem', borderLeft: `2px solid ${T.gold}`, paddingLeft: 8 }}>{aiInfo.description}</p>}
@@ -101,24 +101,24 @@ export default function AddWineModal({ pre = {}, onAdd, onClose }) {
         )}
 
         <div style={G}>
-          <div><label style={lbl}>빈티지</label><input value={form.vintage} onChange={e => set('vintage', e.target.value)} type="number" placeholder="?? 2018" /></div>
-          <div><label style={lbl}>?�량 (�?</label><input value={form.qty} onChange={e => set('qty', e.target.value)} type="number" min="1" /></div>
+          <div><label style={lbl}>빈티지</label><input value={form.vintage} onChange={e => set('vintage', e.target.value)} type="number" placeholder="예: 2018" /></div>
+          <div><label style={lbl}>수량 (병)</label><input value={form.qty} onChange={e => set('qty', e.target.value)} type="number" min="1" /></div>
         </div>
         <div style={G}>
-          <div><label style={lbl}>구매??/label><input value={form.purchaseDate} onChange={e => set('purchaseDate', e.target.value)} type="date" /></div>
-          <div><label style={lbl}>구매가�?(??</label><input value={form.price} onChange={e => set('price', e.target.value)} type="number" placeholder="?? 150000" /></div>
+          <div><label style={lbl}>구매일</label><input value={form.purchaseDate} onChange={e => set('purchaseDate', e.target.value)} type="date" /></div>
+          <div><label style={lbl}>구매가격 (₩)</label><input value={form.price} onChange={e => set('price', e.target.value)} type="number" placeholder="예: 150000" /></div>
         </div>
         <div style={G}>
           <div>
-            <label style={lbl}>?�??/label>
+            <label style={lbl}>셀러</label>
             <select value={form.cellarId} onChange={e => { set('cellarId', e.target.value); set('slot', '1') }}>
               {CELLARS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
-            <label style={lbl}>�?번호</label>
+            <label style={lbl}>칸 번호</label>
             <select value={form.slot} onChange={e => set('slot', e.target.value)}>
-              {getSlots(curCellar).map(s => <option key={s} value={s}>{s}�?�?/option>)}
+              {getSlots(curCellar).map(s => <option key={s} value={s}>{s}번 칸</option>)}
             </select>
           </div>
         </div>
@@ -132,11 +132,11 @@ export default function AddWineModal({ pre = {}, onAdd, onClose }) {
 
         <div style={{ marginBottom: 22 }}>
           <label style={lbl}>메모</label>
-          <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2} placeholder="?�이?�팅 ?�트, 보�? 메모 ??.." style={{ resize: 'vertical' }} />
+          <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={2} placeholder="테이스팅 노트, 보관 메모 등..." style={{ resize: 'vertical' }} />
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <Btn variant="ghost" onClick={onClose}>취소</Btn>
-          <Btn variant="gold" onClick={submit}>?�??/Btn>
+          <Btn variant="gold" onClick={submit}>저장</Btn>
         </div>
       </div>
     </div>
