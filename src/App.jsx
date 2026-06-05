@@ -134,7 +134,7 @@ export default function App() {
       />
 
       <main style={{ flex: 1, padding: '24px 28px', maxWidth: 1060, margin: '0 auto', width: '100%', paddingBottom: 100 }}>
-        {tab === 'dash'   && <Dashboard {...shared} setTab={setTab} />}
+        {tab === 'dash'   && <Dashboard {...shared} setTab={setTab} openDetail={openDetail} />}
         {tab === 'cellar' && <CellarView {...shared} onDrink={openDrink} />}
         {tab === 'log'    && <DrinkLogView drinkLog={drinkLog} onDelete={removeDrink} />}
         {tab === 'search' && <SearchView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} />}

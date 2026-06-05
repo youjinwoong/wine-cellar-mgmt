@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { CELLARS, getSlots, T, krw, getDrinkingStatus } from '../config/cellars.js'
 import { useIsMobile } from './ui.jsx'
 
-export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCellarId }) {
+export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCellarId, openDetail }) {
   const mobile = useIsMobile()
   const year = new Date().getFullYear()
 
@@ -71,23 +71,33 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
           {drinkNow.length > 0 && (
             <div style={{ background:'#4a8a5e18', border:'1px solid #4a8a5e44', borderRadius:12, padding:16 }}>
               <div style={{ fontSize:'0.72rem', color:'#4a8a5e', fontWeight:600, marginBottom:10 }}>🟢 지금 마시기 좋은 와인 ({drinkNow.length}종)</div>
-              {drinkNow.slice(0,4).map(w => (
-                <div key={w.id} style={{ fontSize:'0.8rem', color:T.cream, display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom:`1px solid ${T.border}` }}>
-                  <span>{w.name}</span>
-                  <span style={{ color:T.gold }}>{w.vintage}</span>
-                </div>
-              ))}
+              <div style={{ maxHeight:200, overflowY:'auto' }}>
+                {drinkNow.map(w => (
+                  <div key={w.id} onClick={() => openDetail && openDetail(w.id)} style={{ fontSize:'0.8rem', color:T.cream, display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:`1px solid ${T.border}`, cursor:'pointer', transition:'color 0.15s' }}
+                    onMouseEnter={e=>e.currentTarget.style.color=T.gold}
+                    onMouseLeave={e=>e.currentTarget.style.color=T.cream}
+                  >
+                    <span>{w.name}</span>
+                    <span style={{ color:T.gold, flexShrink:0, marginLeft:8 }}>{w.vintage}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {lowStock.length > 0 && (
             <div style={{ background:T.wine+'18', border:`1px solid ${T.wine}44`, borderRadius:12, padding:16 }}>
               <div style={{ fontSize:'0.72rem', color:T.wineLight, fontWeight:600, marginBottom:10 }}>⚠️ 재고 1병 이하 ({lowStock.length}종)</div>
-              {lowStock.slice(0,4).map(w => (
-                <div key={w.id} style={{ fontSize:'0.8rem', color:T.cream, display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom:`1px solid ${T.border}` }}>
-                  <span>{w.name}</span>
-                  <span style={{ color:T.wineLight }}>{w.qty || 1}병 남음</span>
-                </div>
-              ))}
+              <div style={{ maxHeight:200, overflowY:'auto' }}>
+                {lowStock.map(w => (
+                  <div key={w.id} onClick={() => openDetail && openDetail(w.id)} style={{ fontSize:'0.8rem', color:T.cream, display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:`1px solid ${T.border}`, cursor:'pointer', transition:'color 0.15s' }}
+                    onMouseEnter={e=>e.currentTarget.style.color=T.wineLight}
+                    onMouseLeave={e=>e.currentTarget.style.color=T.cream}
+                  >
+                    <span>{w.name}</span>
+                    <span style={{ color:T.wineLight, flexShrink:0, marginLeft:8 }}>{w.qty || 1}병 남음</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -101,7 +111,10 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
             {recommended.map(w => {
               const s = getDrinkingStatus(w)
               return (
-                <div key={w.id} style={{ background:T.card, border:`1px solid ${T.gold}44`, borderRadius:12, padding:16 }}>
+                <div key={w.id} onClick={() => openDetail && openDetail(w.id)} style={{ background:T.card, border:`1px solid ${T.gold}44`, borderRadius:12, padding:16, cursor:'pointer', transition:'border-color 0.2s' }}
+                  onMouseEnter={e=>e.currentTarget.style.borderColor=T.gold}
+                  onMouseLeave={e=>e.currentTarget.style.borderColor=T.gold+'44'}
+                >
                   <div style={{ fontFamily:'Cormorant Garamond,serif', fontSize:'1rem', fontWeight:600, color:T.cream, marginBottom:4 }}>{w.name}</div>
                   <div style={{ color:T.gold, fontWeight:600, marginBottom:6 }}>{w.vintage}</div>
                   {s && <div style={{ fontSize:'0.72rem', color:s.color, background:s.color+'22', borderRadius:6, padding:'3px 8px', display:'inline-block', marginBottom:8 }}>{s.icon} {s.label}</div>}
