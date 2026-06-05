@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CELLARS, cellarById, T, krw, kdate } from '../config/cellars.js'
+import { CELLARS, cellarById, T, krw, kdate, getDrinkingStatus } from '../config/cellars.js'
 import { useIsMobile } from './ui.jsx'
 
 // ── Search View ─────────────────────────────────────────────────
@@ -206,6 +206,143 @@ export function DrinkLogView({ drinkLog, onDelete }) {
             ))}
           </div>
       }
+    </div>
+  )
+}
+
+// ── Statistics View ─────────────────────────────────────────────
+export function StatisticsView({ wines, drinkLog }) {
+  const mobile = useIsMobile()
+  const krw = n => n ? '₩' + Number(n).toLocaleString('ko-KR') : '-'
+  const year = new Date().getFullYear()
+
+  // 월별 음주 통계
+  const monthlyData = {}
+  drinkLog.forEach(r => {
+    if (!r.date) return
+    const ym = r.date.substring(0, 7)
+    monthlyData[ym] = (monthlyData[ym] || 0) + 1
+  })
+  const months = Object.entries(monthlyData).sort((a,b) => b[0].localeCompare(a[0])).slice(0, 12)
+
+  // 가장 많이 마신 와인
+  const wineCount = {}
+  drinkLog.forEach(r => { wineCount[r.wineName] = (wineCount[r.wineName] || 0) + 1 })
+  const topWines = Object.entries(wineCount).sort((a,b) => b[1]-a[1]).slice(0, 5)
+
+  // 함께한 사람
+  const companionCount = {}
+  drinkLog.forEach(r => {
+    if (!r.companions) return
+    r.companions.split(/[,，、\s]+/).filter(Boolean).forEach(c => {
+      companionCount[c.trim()] = (companionCount[c.trim()] || 0) + 1
+    })
+  })
+  const topCompanions = Object.entries(companionCount).sort((a,b) => b[1]-a[1]).slice(0, 5)
+
+  // 평균 평점
+  const rated = drinkLog.filter(r => r.rating > 0)
+  const avgRating = rated.length ? (rated.reduce((s,r) => s+r.rating, 0) / rated.length).toFixed(1) : '-'
+
+  // 셀러 가치
+  const totalPurchase = wines.reduce((s,w) => s + (w.price||0)*(w.qty||1), 0)
+  const totalMarket   = wines.reduce((s,w) => s + (w.wineSearcherPrice||0)*(w.qty||1), 0)
+  const totalBottles  = wines.reduce((s,w) => s + (w.qty||1), 0)
+
+  const Card = ({ title, children }) => (
+    <div style={{ background:T.card, border:`1px solid ${T.border}`, borderRadius:12, padding:20, marginBottom:16 }}>
+      <div style={{ fontSize:'0.75rem', color:T.gold, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14, fontWeight:600 }}>{title}</div>
+      {children}
+    </div>
+  )
+
+  return (
+    <div className="fade-in">
+      <h1 className="heading">통계</h1>
+      <p className="subheading">셀러 가치 · 음주 패턴 분석</p>
+
+      {/* 셀러 가치 요약 */}
+      <Card title="💰 셀러 가치">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:12 }}>
+          {[
+            ['총 보유 병 수', `${totalBottles}병`],
+            ['총 와인 종류', `${wines.length}종`],
+            ['구매가 합계', krw(totalPurchase)],
+            ['시장가 합계', krw(totalMarket)],
+            ['평가 차익', totalMarket>totalPurchase ? '+'+krw(totalMarket-totalPurchase) : krw(totalMarket-totalPurchase)],
+            ['평균 병당 가치', krw(Math.round(totalMarket/totalBottles)||0)],
+          ].map(([k,v]) => (
+            <div key={k} style={{ background:T.surface, borderRadius:8, padding:'10px 12px', border:`1px solid ${T.border}` }}>
+              <div style={{ fontSize:'0.66rem', color:T.muted, marginBottom:5 }}>{k}</div>
+              <div style={{ fontSize:'0.95rem', fontWeight:600, color: k==='평가 차익'&&totalMarket>totalPurchase?'#4a8a5e':T.cream }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* 음주 요약 */}
+      <Card title="🍷 음주 요약">
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))', gap:12 }}>
+          {[
+            ['총 음주 횟수', `${drinkLog.length}번`],
+            ['평균 평점', `${avgRating}점`],
+            ['올해 음주', `${drinkLog.filter(r=>r.date?.startsWith(String(year))).length}번`],
+          ].map(([k,v]) => (
+            <div key={k} style={{ background:T.surface, borderRadius:8, padding:'10px 12px', border:`1px solid ${T.border}` }}>
+              <div style={{ fontSize:'0.66rem', color:T.muted, marginBottom:5 }}>{k}</div>
+              <div style={{ fontSize:'0.95rem', fontWeight:600, color:T.cream }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* 월별 음주 */}
+      {months.length > 0 && (
+        <Card title="📅 월별 음주 횟수">
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {months.map(([ym, cnt]) => {
+              const max = Math.max(...months.map(m=>m[1]))
+              return (
+                <div key={ym} style={{ display:'flex', gap:10, alignItems:'center' }}>
+                  <div style={{ fontSize:'0.78rem', color:T.muted, width:60, flexShrink:0 }}>{ym}</div>
+                  <div style={{ flex:1, background:T.surface, borderRadius:4, height:20, overflow:'hidden' }}>
+                    <div style={{ height:'100%', borderRadius:4, background:`linear-gradient(90deg,${T.wine},${T.gold})`, width:`${cnt/max*100}%`, display:'flex', alignItems:'center', paddingLeft:8 }}>
+                      <span style={{ fontSize:'0.7rem', color:T.cream, fontWeight:600 }}>{cnt}번</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* 자주 마신 와인 */}
+      {topWines.length > 0 && (
+        <Card title="🏆 자주 마신 와인 TOP 5">
+          {topWines.map(([name, cnt], i) => (
+            <div key={name} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:i<topWines.length-1?`1px solid ${T.border}`:'none' }}>
+              <div style={{ width:24, height:24, borderRadius:'50%', background:i===0?T.gold:T.surface, border:`1px solid ${i===0?T.gold:T.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.72rem', fontWeight:700, color:i===0?T.bg:T.muted, flexShrink:0 }}>{i+1}</div>
+              <div style={{ flex:1, fontSize:'0.88rem', color:T.cream }}>{name}</div>
+              <div style={{ fontSize:'0.82rem', color:T.gold, fontWeight:600 }}>{cnt}번</div>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      {/* 함께한 사람 */}
+      {topCompanions.length > 0 && (
+        <Card title="👥 함께한 사람 TOP 5">
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {topCompanions.map(([name, cnt]) => (
+              <div key={name} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:20, padding:'6px 14px', display:'flex', gap:6, alignItems:'center' }}>
+                <span style={{ fontSize:'0.82rem', color:T.cream }}>{name}</span>
+                <span style={{ fontSize:'0.72rem', color:T.gold, fontWeight:600 }}>{cnt}번</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

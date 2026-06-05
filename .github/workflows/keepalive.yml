@@ -1,0 +1,23 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # 매일 오전 9시 (UTC) = 한국 오후 6시
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase DB
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://nmjawxbbwlerugfyypft.supabase.co/rest/v1/wines?select=id&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tamF3eGJid2xlcnVnZnl5cGZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NjgwNDQsImV4cCI6MjA5NTU0NDA0NH0.TIIjA4J2a2Fuf0HyEXeYobWHPpzYerItNoO7OtR-MaU" \
+            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tamF3eGJid2xlcnVnZnl5cGZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NjgwNDQsImV4cCI6MjA5NTU0NDA0NH0.TIIjA4J2a2Fuf0HyEXeYobWHPpzYerItNoO7OtR-MaU")
+          echo "Supabase ping status: $STATUS"
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Supabase is active"
+          else
+            echo "⚠️ Unexpected status: $STATUS"
+          fi

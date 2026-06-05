@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CELLARS, getSlots, cellarById, T, krw } from '../config/cellars.js'
+import { CELLARS, getSlots, cellarById, T, krw, getDrinkingStatus } from '../config/cellars.js'
 import { Btn, useIsMobile } from './ui.jsx'
 
 export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCellarId, openAdd, openDetail, onDrink }) {

@@ -8,7 +8,7 @@ import {
 import Header from './components/Header.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import CellarView from './components/CellarView.jsx'
-import { SearchView, ListView, DrinkLogView } from './components/Views.jsx'
+import { SearchView, ListView, DrinkLogView, StatisticsView } from './components/Views.jsx'
 import AddWineModal from './components/modals/AddWineModal.jsx'
 import { DetailModal, DrinkModal, SettingsModal, BulkImportModal } from './components/modals/Modals.jsx'
 import { Toast } from './components/ui.jsx'
@@ -139,6 +139,7 @@ export default function App() {
         {tab === 'log'    && <DrinkLogView drinkLog={drinkLog} onDelete={removeDrink} />}
         {tab === 'search' && <SearchView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} />}
         {tab === 'list'   && <ListView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} />}
+        {tab === 'stats'  && <StatisticsView wines={wines} drinkLog={drinkLog} />}
       </main>
 
       {/* Modals */}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CELLARS, getSlots, cellarById, T, uid, krw, kdate, callAI, compressImage } from '../../config/cellars.js'
+import { CELLARS, getSlots, cellarById, T, uid, krw, kdate, callAI, compressImage, getDrinkingStatus, getShareUrl, copyToClipboard } from '../../config/cellars.js'
 import { Btn, lbl, StarRating, ImagePicker } from '../ui.jsx'
 
 // ── Detail Modal ────────────────────────────────────────────────
