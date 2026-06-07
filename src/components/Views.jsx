@@ -315,7 +315,7 @@ export function StatisticsView({ wines, drinkLog }) {
   return (
     <div className="fade-in">
       <h1 className="heading">통계</h1>
-      <p className="subheading">나의 와인 라이프 < 한눈에 보기</p>
+      <p className="subheading">나의 와인 라이프 — 한눈에 보기</p>
 
       <Card title="셀러 현황">
         <div style={{ display:'grid', gridTemplateColumns:`repeat(auto-fit,minmax(140px,1fr))`, gap:12 }}>
