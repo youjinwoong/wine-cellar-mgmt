@@ -224,10 +224,12 @@ async function resizeForVision(file) {
 }
 
 // Anthropic API 직접 호출 (cellars.js callAI 우회 — API 키 문제 방어)
-async function callVisionAPI(messages, maxTokens = 2000, tools = null) {
+// vision=true: 이미지 분석용 sonnet, false: 텍스트 검색용 haiku
+async function callVisionAPI(messages, maxTokens = 2000, tools = null, vision = false) {
   const key = localStorage.getItem('cave_anthropic_key')?.trim()
   if (!key) throw new Error('API 키 없음')
-  const body = { model: 'claude-opus-4-5', max_tokens: maxTokens, messages }
+  const model = vision ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'
+  const body = { model, max_tokens: maxTokens, messages }
   if (tools) body.tools = tools
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -325,7 +327,7 @@ export function BulkImportModal({ onAddMany, onClose }) {
 
 반드시 아래 JSON 배열 형식만 반환하세요 (마크다운, 설명 텍스트 절대 없이):
 [{"name":"와인 전체 이름","vintage":연도숫자또는null,"qty":병수정수}]` }
-        ]}], 3000)
+        ]}], 3000, null, true)
 
         const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '[]'
         console.log('[Vision] Raw response:', text)
