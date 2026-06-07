@@ -70,6 +70,7 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
       if (sort === 'name')    return (a.name || '').localeCompare(b.name || '', 'ko')
       if (sort === 'vintage') return (b.vintage || 0) - (a.vintage || 0)
       if (sort === 'price')   return (b.price || 0) - (a.price || 0)
+      if (sort === 'market')  return (b.wineSearcherPrice || 0) - (a.wineSearcherPrice || 0)
       if (sort === 'date')    return new Date(b.purchaseDate || 0) - new Date(a.purchaseDate || 0)
       return 0
     })
@@ -129,7 +130,8 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
           <select value={sort} onChange={e => setSort(e.target.value)} style={{ width: 'auto', fontSize: '0.8rem', padding: '7px 10px' }}>
             <option value="name">이름순</option>
             <option value="vintage">빈티지순</option>
-            <option value="price">가격순</option>
+            <option value="price">구매가순</option>
+            <option value="market">시장가순</option>
             <option value="date">구매일순</option>
           </select>
         </div>
