@@ -96,7 +96,7 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
     setConfirmBulkDelete(false)
   }
 
-  const COLS = '28px 48px 2fr 72px 56px 110px 110px 110px 96px'
+  const COLS = '28px 48px 2fr 72px 56px 120px 120px 96px'
 
   return (
     <div className="fade-in">
@@ -175,8 +175,7 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
                 <span style={{ textAlign: 'center' }}>빈티지</span>
                 <span style={{ textAlign: 'right' }}>수량</span>
                 <span style={{ textAlign: 'right' }}>구매가</span>
-                <span style={{ textAlign: 'right' }}>시장가</span>
-                <span style={{ textAlign: 'right' }}>구매일</span>
+                <span style={{ textAlign: 'right', color: '#C9A84C' }}>시장가(₩)</span>
                 <span>위치</span>
               </div>
               {sorted.map(w => {
@@ -200,9 +199,8 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
                     </div>
                     <span style={{ fontSize: '0.875rem', color: T.gold, fontWeight: 500, textAlign: 'center' }}>{w.vintage || '??'}</span>
                     <span style={{ fontSize: '0.875rem', color: T.text, textAlign: 'right' }}>{w.qty || 1}병</span>
-                    <span style={{ fontSize: '0.875rem', color: T.text, textAlign: 'right' }}>{krw(w.price)}</span>
-                    <span style={{ fontSize: '0.875rem', color: w.wineSearcherPrice ? T.gold : T.muted, textAlign: 'right' }}>{w.wineSearcherPrice ? krw(w.wineSearcherPrice) : '-'}</span>
-                    <span style={{ fontSize: '0.78rem', color: T.muted }}>{kdate(w.purchaseDate)}</span>
+                    <span style={{ fontSize: '0.875rem', color: T.text, textAlign: 'right' }}>{krw(w.price) || '-'}</span>
+                    <span style={{ fontSize: '0.875rem', color: w.wineSearcherPrice ? T.gold : T.muted, fontWeight: w.wineSearcherPrice ? 600 : 400, textAlign: 'right' }}>{w.wineSearcherPrice ? krw(w.wineSearcherPrice) : '-'}</span>
                     <div onClick={e => { e.stopPropagation(); goSlot(w.cellarId, w.slot) }} style={{ cursor: 'pointer' }}>
                       <div style={{ fontSize: '0.72rem', fontWeight: 600, color: T.cream }}>{c?.name}</div>
                       <div style={{ fontSize: '0.68rem', color: T.muted }}>{w.slot}번 칸</div>
