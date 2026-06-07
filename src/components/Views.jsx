@@ -129,12 +129,16 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
             tools: [{ type: 'web_search_20250305', name: 'web_search' }],
             messages: [{ role: 'user', content:
               `와인 "${q}"의 가격을 검색하여 JSON만 반환 (마크다운 없이):
+와인 "${q}"의 가격을 검색하여 JSON만 반환 (마크다운 없이):
 {"wineSearcherPrice":null,"vivinoPrice":null,"vivinoRating":null}
 
-가격 우선순위 (750ml 기준):
-1. dailyshot.co.kr KRW → wineSearcherPrice
-2. wine-searcher.com 한국가 KRW → wineSearcherPrice
-3. vivino.com USD → vivinoPrice
+가격 수집 방법 (750ml 기준):
+- wine-searcher.com 한국(Korea) KRW 가격 조회
+- dailyshot.co.kr KRW 가격 조회
+- vivino.com USD 가격 조회 후 현재 환율로 KRW 환산
+
+세 가격 중 가장 높은 KRW → wineSearcherPrice
+vivino USD 원본 → vivinoPrice
 숫자만, 모르면 null` }]
           })
         })

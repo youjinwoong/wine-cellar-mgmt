@@ -321,13 +321,16 @@ export function BulkImportModal({ onAddMany, onClose }) {
           `와인 "${q}"의 정보를 웹에서 검색하여 아래 JSON 형식으로만 반환하세요 (마크다운 없이, 설명 없이):
 {"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종","description":"이 와인을 한국어로 2문장 설명","imageUrl":"","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
 
-가격 검색 우선순위 (750ml 1병 기준):
-1. dailyshot.co.kr 에서 "${q}" 검색 → 데일리샷 판매가 KRW → wineSearcherPrice에 입력
-2. 데일리샷에 없으면 wine-searcher.com 한국(Korea) 판매가 KRW → wineSearcherPrice에 입력
-3. 둘 다 없으면 vivino.com USD 가격 → vivinoPrice에 입력
+가격 수집 방법 (750ml 1병 기준):
+- wine-searcher.com 한국(Korea) KRW 가격 조회
+- dailyshot.co.kr KRW 가격 조회  
+- vivino.com USD 가격 조회 후 현재 환율로 KRW 환산
 
-- wineSearcherPrice: KRW 숫자만 (예: 1100000)
-- vivinoPrice: USD 숫자만 (예: 634)
+위 세 가격 중 가장 높은 KRW 금액을 wineSearcherPrice에 입력하세요.
+vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
+
+- wineSearcherPrice: KRW 숫자만, 가장 높은 가격 (예: 1100000)
+- vivinoPrice: USD 숫자만, vivino 원본 (예: 634)
 - vivinoRating: Vivino 평점 숫자만 (예: 4.5)
 - 모르는 필드는 null로 두세요.` }],
           1500, webSearchTool)
