@@ -206,18 +206,42 @@ async function resizeForVision(file) {
     reader.onload = e => {
       const img = new Image()
       img.onload = () => {
-        const scale = Math.min(1, 1600 / img.width)
+        // 해상도를 2400px로 높여 라벨 텍스트 인식률 향상
+        const MAX = 2400
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
         const canvas = document.createElement('canvas')
         canvas.width = Math.round(img.width * scale)
         canvas.height = Math.round(img.height * scale)
         canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+        // 품질 0.92로 높여 텍스트 선명도 유지
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
         resolve({ dataUrl, base64: dataUrl.split(',')[1] })
       }
       img.src = e.target.result
     }
     reader.readAsDataURL(file)
   })
+}
+
+// Anthropic API 직접 호출 (cellars.js callAI 우회 — API 키 문제 방어)
+async function callVisionAPI(messages, maxTokens = 2000) {
+  const key = localStorage.getItem('cave_anthropic_key')?.trim()
+  if (!key) throw new Error('API 키 없음')
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: maxTokens, messages })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error?.message || `HTTP ${res.status}`)
+  }
+  return res.json()
 }
 
 export function BulkImportModal({ onAddMany, onClose }) {
@@ -233,26 +257,60 @@ export function BulkImportModal({ onAddMany, onClose }) {
   async function handleFiles(e) {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
+
+    // API 키 선체크
+    const apiKey = localStorage.getItem('cave_anthropic_key')?.trim()
+    if (!apiKey) {
+      alert('⚙️ 설정에서 Claude API 키를 먼저 입력해주세요!\n\n우측 상단 ⚙️ 설정 → Anthropic API Key 입력')
+      return
+    }
+
     const newPhotos = files.map(f => ({ id: uid(), file: f, dataUrl: null, status: 'pending' }))
     setPhotos(p => [...p, ...newPhotos])
     for (const ph of newPhotos) {
       const { dataUrl, base64 } = await resizeForVision(ph.file)
       setPhotos(p => p.map(x => x.id === ph.id ? { ...x, dataUrl, status: 'scanning' } : x))
       try {
-        const data = await callAI([{ role: 'user', content: [
+        const data = await callVisionAPI([{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-          { type: 'text', text: `이 와인 사진에서 모든 와인 라벨을 분석하세요. JSON 배열만 반환 (다른 텍스트 없이):
-[{"name":"와인 이름","vintage":연도숫자또는null,"qty":같은와인병수}]
-라벨이 일부만 보여도 최대한 추정하세요. 전혀 모르면 name을 "미확인"으로.` }
-        ]}], 2000)
+          { type: 'text', text: `당신은 와인 라벨 전문가입니다. 이 셀러 사진에서 보이는 모든 와인 병의 라벨을 분석해주세요.
+
+분석 지침:
+- 병이 눕혀 있거나 라벨이 측면/부분만 보여도 최대한 읽어주세요
+- 같은 와인이 여러 병 있으면 qty에 병 수를 기재하세요
+- 빈티지(연도)가 라벨에 보이면 반드시 기재하세요
+- 와인 이름은 라벨에 표기된 공식 명칭으로 (예: "Château Lafite Rothschild", "Opus One")
+- 같은 와인이라도 빈티지가 다르면 각각 별도 항목으로 기재하세요
+- 라벨을 전혀 읽을 수 없는 병만 "미확인"으로 처리하세요
+
+반드시 아래 JSON 배열 형식만 반환하세요 (마크다운, 설명 텍스트 절대 없이):
+[{"name":"와인 전체 이름","vintage":연도숫자또는null,"qty":병수정수}]` }
+        ]}], 3000)
+
         const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '[]'
-        const found = JSON.parse(text.match(/\[[\s\S]*\]/)?.[0] || '[]')
-        const withMeta = found.map(w => ({ _id: uid(), name: w.name || '', vintage: w.vintage || null, qty: w.qty || 1, cellarId, slot, price: '', purchaseDate: '', imageUrl: '', notes: '', _enriched: false }))
+        console.log('[Vision] Raw response:', text) // 디버그용
+
+        // JSON 추출 — 코드블록 포함 다양한 형식 처리
+        const cleaned = text.replace(/```json|```/g, '').trim()
+        const match = cleaned.match(/\[[\s\S]*\]/)
+        if (!match) throw new Error(`JSON 배열 없음: ${text.slice(0, 100)}`)
+
+        const found = JSON.parse(match[0])
+        if (!Array.isArray(found) || found.length === 0) throw new Error('빈 배열 반환')
+
+        const withMeta = found.map(w => ({
+          _id: uid(), name: w.name || '', vintage: w.vintage || null,
+          qty: w.qty || 1, cellarId, slot, price: '', purchaseDate: '',
+          imageUrl: '', notes: '', _enriched: false
+        }))
         setWineList(p => [...p, ...withMeta])
         setPhotos(p => p.map(x => x.id === ph.id ? { ...x, status: 'done', count: found.length } : x))
       } catch (err) {
-        if (err.message === 'API 키 없음') alert('⚙️ 설정에서 Claude API 키를 입력해주세요')
-        setPhotos(p => p.map(x => x.id === ph.id ? { ...x, status: 'error' } : x))
+        console.error('[Vision] Error:', err)
+        const msg = err.message === 'API 키 없음'
+          ? '⚙️ API 키를 설정에서 입력해주세요'
+          : `인식 실패: ${err.message}`
+        setPhotos(p => p.map(x => x.id === ph.id ? { ...x, status: 'error', errMsg: msg } : x))
       }
     }
     e.target.value = ''
@@ -265,11 +323,23 @@ export function BulkImportModal({ onAddMany, onClose }) {
       const w = toEnrich[i]
       try {
         const q = w.vintage ? `${w.name} ${w.vintage}` : w.name
-        const data = await callAI([{ role: 'user', content: `와인 "${q}"을 Vivino·Wine-Searcher에서 검색하고 JSON만: {"producer":"","region":"","country":"","grape":"","description":"한국어2문장","imageUrl":"","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}` }], 600, [{ type: 'web_search_20250305', name: 'web_search' }])
+        const data = await callVisionAPI([{ role: 'user', content:
+          `와인 "${q}"의 정보를 검색해서 아래 JSON 형식으로만 반환하세요 (마크다운 없이, 설명 없이):
+{"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종(Cabernet Sauvignon 등)","description":"이 와인을 한국어로 2문장 설명","imageUrl":"","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
+
+- wineSearcherPrice: 한국 시장가 KRW 숫자 (없으면 null)
+- vivinoPrice: 글로벌 USD 숫자 (없으면 null)
+- vivinoRating: Vivino 평점 숫자 (없으면 null)
+잘 모르는 필드는 null이나 빈 문자열로 두세요.` }], 1000)
         const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
-        const info = JSON.parse(text.replace(/```json|```/g, '').trim())
+        console.log(`[Enrich] ${q}:`, text)
+        const cleaned = text.replace(/```json|```/g, '').trim()
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+        const info = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
         setWineList(p => p.map(x => x._id === w._id ? { ...x, ...info, _enriched: true } : x))
-      } catch {}
+      } catch (err) {
+        console.error(`[Enrich] ${w.name} 실패:`, err)
+      }
       setEnrichProgress(Math.round((i + 1) / toEnrich.length * 100))
     }
     setEnriching(false)
@@ -332,7 +402,7 @@ export function BulkImportModal({ onAddMany, onClose }) {
                         {ph.status === 'pending' && <span style={{ color: T.muted }}>대기 중...</span>}
                         {ph.status === 'scanning' && <span style={{ color: T.gold }}>🔍 분석 중...</span>}
                         {ph.status === 'done' && <span style={{ color: '#4a8a5e' }}>✓ {ph.count}종 인식</span>}
-                        {ph.status === 'error' && <span style={{ color: '#c0392b' }}>✕ 인식 실패</span>}
+                        {ph.status === 'error' && <span style={{ color: '#c0392b' }}>✕ {ph.errMsg || '인식 실패'}</span>}
                       </div>
                     </div>
                   </div>
