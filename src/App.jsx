@@ -31,6 +31,22 @@ export default function App() {
     setTimeout(() => setToast(null), duration)
   }, [])
 
+  // ── 시장가 일괄 업데이트 이벤트 리스너 ─────────────────────
+  useEffect(() => {
+    const handler = async (e) => {
+      const { id, wineSearcherPrice, vivinoPrice, vivinoRating } = e.detail
+      const wine = wines.find(w => w.id === id)
+      if (!wine) return
+      const updates = {}
+      if (wineSearcherPrice) updates.wineSearcherPrice = wineSearcherPrice
+      if (vivinoPrice) updates.vivinoPrice = vivinoPrice
+      if (vivinoRating) updates.vivinoRating = vivinoRating
+      if (Object.keys(updates).length > 0) await updateWine(id, updates)
+    }
+    window.addEventListener('cave:priceUpdate', handler)
+    return () => window.removeEventListener('cave:priceUpdate', handler)
+  }, [wines])
+
   // ── Load data ────────────────────────────────────────────────
   useEffect(() => {
     async function init() {

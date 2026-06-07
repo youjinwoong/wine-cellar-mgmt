@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CELLARS, cellarById, T, krw, kdate, getDrinkingStatus } from '../config/cellars.js'
+import { CELLARS, cellarById, T, krw, kdate, getDrinkingStatus, callAI } from '../config/cellars.js'
 import { useIsMobile } from './ui.jsx'
 
 // ── Search View ──────────────────────────────────────────────────
@@ -63,6 +63,9 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
   const [filterCellar, setFilterCellar] = useState('')
   const [selected, setSelected] = useState(new Set())
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [priceUpdating, setPriceUpdating] = useState(false)
+  const [priceProgress, setPriceProgress] = useState({ current: 0, total: 0, name: '' })
+  const [priceUpdateDone, setPriceUpdateDone] = useState(false)
 
   const sorted = [...wines]
     .filter(w => !filterCellar || w.cellarId === filterCellar)
@@ -97,6 +100,64 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
     setConfirmBulkDelete(false)
   }
 
+  async function handleBulkPriceUpdate() {
+    const targets = sorted.filter(w => !w.wineSearcherPrice)
+    if (targets.length === 0) {
+      alert('시장가가 없는 와인이 없습니다.')
+      return
+    }
+    const apiKey = localStorage.getItem('cave_anthropic_key')?.trim()
+    if (!apiKey) { alert('⚙️ 설정에서 Claude API 키를 먼저 입력해주세요!'); return }
+    setPriceUpdating(true)
+    setPriceUpdateDone(false)
+    for (let i = 0; i < targets.length; i++) {
+      const w = targets[i]
+      setPriceProgress({ current: i + 1, total: targets.length, name: w.name })
+      try {
+        const q = w.vintage ? `${w.name} ${w.vintage}` : w.name
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 800,
+            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+            messages: [{ role: 'user', content:
+              `와인 "${q}"의 가격을 검색하여 JSON만 반환 (마크다운 없이):
+{"wineSearcherPrice":null,"vivinoPrice":null,"vivinoRating":null}
+
+가격 우선순위 (750ml 기준):
+1. dailyshot.co.kr KRW → wineSearcherPrice
+2. wine-searcher.com 한국가 KRW → wineSearcherPrice
+3. vivino.com USD → vivinoPrice
+숫자만, 모르면 null` }]
+          })
+        })
+        const data = await res.json()
+        const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
+        const cleaned = text.replace(/\`\`\`json|\`\`\`/g, '').trim()
+        const match = cleaned.match(/\{[\s\S]*\}/)
+        if (match) {
+          const info = JSON.parse(match[0])
+          if (info.wineSearcherPrice || info.vivinoPrice) {
+            // App.jsx의 updateWine 대신 직접 wines 배열 업데이트를 위해 onUpdate 필요
+            // wines prop을 통해 직접 업데이트할 수 없으므로 커스텀 이벤트로 처리
+            window.dispatchEvent(new CustomEvent('cave:priceUpdate', { detail: { id: w.id, ...info } }))
+          }
+        }
+      } catch(e) { console.error('[PriceUpdate]', w.name, e) }
+      await new Promise(r => setTimeout(r, 500))
+    }
+    setPriceUpdating(false)
+    setPriceUpdateDone(true)
+    setTimeout(() => setPriceUpdateDone(false), 4000)
+  }
+
   const COLS = '28px 48px 2fr 72px 56px 120px 120px 96px'
 
   return (
@@ -122,6 +183,18 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
                 🗑 선택 삭제 ({selected.size}개)
               </button>
             )
+          )}
+          {/* 시장가 일괄 업데이트 */}
+          {priceUpdating ? (
+            <div style={{ background: T.gold + '22', border: `1px solid ${T.gold}66`, borderRadius: 8, padding: '6px 14px', fontSize: '0.78rem', color: T.gold, minWidth: 200 }}>
+              💰 {priceProgress.current}/{priceProgress.total} — {priceProgress.name.slice(0, 15)}{priceProgress.name.length > 15 ? '...' : ''}
+            </div>
+          ) : priceUpdateDone ? (
+            <div style={{ background: '#4a8a5e22', border: '1px solid #4a8a5e', borderRadius: 8, padding: '6px 14px', fontSize: '0.78rem', color: '#4a8a5e' }}>✓ 시장가 업데이트 완료</div>
+          ) : (
+            <button onClick={handleBulkPriceUpdate} style={{ background: T.gold + '22', color: T.gold, border: `1px solid ${T.gold}44`, borderRadius: 8, padding: '7px 14px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>
+              💰 시장가 일괄 업데이트
+            </button>
           )}
           <select value={filterCellar} onChange={e => setFilterCellar(e.target.value)} style={{ width: 'auto', fontSize: '0.8rem', padding: '7px 10px' }}>
             <option value="">전체 셀러</option>
