@@ -91,6 +91,14 @@ export default function App() {
     catch { showToast('⚠ 기록 저장 실패', 'error') }
   }
 
+  async function removeManyWines(ids) {
+    setWines(p => p.filter(w => !ids.includes(w.id)))
+    for (const id of ids) {
+      try { await deleteWine(id) } catch {}
+    }
+    showToast(`🗑 ${ids.length}개 삭제 완료`, 'success')
+  }
+
   async function removeDrink(id) {
     setDrinkLog(p => p.filter(r => r.id !== id))
     try { await deleteDrink(id) } catch {}
@@ -138,7 +146,7 @@ export default function App() {
         {tab === 'cellar' && <CellarView {...shared} onDrink={openDrink} />}
         {tab === 'log'    && <DrinkLogView drinkLog={drinkLog} onDelete={removeDrink} />}
         {tab === 'search' && <SearchView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} />}
-        {tab === 'list'   && <ListView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} />}
+        {tab === 'list'   && <ListView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} onDeleteMany={removeManyWines} />}
         {tab === 'stats'  && <StatisticsView wines={wines} drinkLog={drinkLog} />}
       </main>
 
