@@ -65,7 +65,7 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
         </div>
       )}
 
-      {/* 알림 */
+      {/* 알림 */}
       {(drinkNow.length > 0 || lowStock.length > 0) && (
         <div style={{ display:'grid', gridTemplateColumns:mobile?'1fr':`repeat(${[drinkNow.length>0, lowStock.length>0].filter(Boolean).length},1fr)`, gap:12, marginBottom:24 }}>
           {drinkNow.length > 0 && (
