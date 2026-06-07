@@ -185,8 +185,10 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
                     onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = T.card }}
                     onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
                   >
-                    <div onClick={e => { e.stopPropagation(); toggleOne(w.id) }} style={{ display: 'flex', alignItems: 'center' }}>
-                      <input type="checkbox" checked={isSelected} onChange={() => toggleOne(w.id)}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <input type="checkbox" checked={isSelected}
+                        onClick={e => e.stopPropagation()}
+                        onChange={() => toggleOne(w.id)}
                         style={{ width: 15, height: 15, accentColor: T.gold, cursor: 'pointer' }} />
                     </div>
                     {w.imageUrl ? <img src={w.imageUrl} alt="" style={{ width: 36, height: 50, objectFit: 'cover', borderRadius: 4 }} onError={e => e.target.style.display = 'none'} /> : <div style={{ width: 36, height: 50, background: T.surface, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>🍷</div>}
