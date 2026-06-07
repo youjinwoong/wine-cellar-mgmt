@@ -7,9 +7,56 @@ export function DetailModal({ wine, onClose, onDrink, onRemove, onUpdate, goSlot
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [form, setForm] = useState({ ...wine })
+  const [aiLoad, setAiLoad] = useState(false)
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const c = cellarById(wine.cellarId)
   const curCellar = cellarById(form.cellarId)
+
+  async function runAI() {
+    if (!form.name?.trim()) return
+    setAiLoad(true)
+    try {
+      const q = form.vintage ? `${form.name} ${form.vintage}` : form.name
+      const apiKey = localStorage.getItem('cave_anthropic_key')?.trim()
+      if (!apiKey) { alert('⚙️ 설정에서 Claude API 키를 먼저 입력해주세요!'); setAiLoad(false); return }
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages: [{ role: 'user', content:
+            `와인 "${q}"의 정보를 웹에서 검색하여 JSON만 반환 (마크다운 없이):
+{"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종","description":"한국어 2문장","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
+
+가격 수집 (750ml 기준):
+- wine-searcher.com 한국 KRW
+- dailyshot.co.kr KRW
+- vivino.com USD → 현재 환율 KRW 환산
+세 가격 중 가장 높은 KRW → wineSearcherPrice
+vivino USD 원본 → vivinoPrice
+숫자만, 모르면 null` }]
+        })
+      })
+      const data = await res.json()
+      const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
+      const cleaned = text.replace(/```json|```/g, '').trim()
+      const match = cleaned.match(/\{[\s\S]*\}/)
+      if (match) {
+        const info = JSON.parse(match[0])
+        setForm(p => ({ ...p, ...info }))
+      }
+    } catch(e) {
+      console.error('[EditAI]', e)
+    }
+    setAiLoad(false)
+  }
 
   function saveEdit() {
     onUpdate({ ...form, vintage: parseInt(String(form.vintage)) || null, qty: parseInt(String(form.qty)) || 1, price: parseInt(String(form.price || '0').replace(/,/g, '')) || 0 })
@@ -22,7 +69,19 @@ export function DetailModal({ wine, onClose, onDrink, onRemove, onUpdate, goSlot
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
         <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '1.3rem', color: T.cream, marginBottom: 20 }}>와인 수정</h2>
-        <div style={{ marginBottom: 12 }}><label style={lbl}>와인 이름</label><input value={form.name} onChange={e => setF('name', e.target.value)} /></div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={lbl}>와인 이름</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={form.name} onChange={e => setF('name', e.target.value)} style={{ flex: 1 }} />
+            <button onClick={runAI} disabled={aiLoad || !form.name?.trim()} style={{
+              background: aiLoad || !form.name?.trim() ? T.muted : T.gold,
+              color: T.bg, border: 'none', borderRadius: 8, padding: '9px 14px',
+              fontSize: '0.8rem', fontWeight: 600,
+              cursor: aiLoad || !form.name?.trim() ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}>{aiLoad ? '검색 중...' : '🔍 AI 검색'}</button>
+          </div>
+        </div>
         <div style={G}>
           <div><label style={lbl}>빈티지</label><input value={form.vintage || ''} onChange={e => setF('vintage', e.target.value)} type="number" /></div>
           <div><label style={lbl}>수량</label><input value={form.qty || 1} onChange={e => setF('qty', e.target.value)} type="number" min="1" /></div>
