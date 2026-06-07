@@ -256,6 +256,43 @@ export function BulkImportModal({ onAddMany, onClose }) {
   const [enrichProgress, setEnrichProgress] = useState(0)
   const curCellar = cellarById(cellarId)
 
+  // enrich 로직 분리 — handleFiles에서도 호출 가능하도록
+  async function enrichWines(wines) {
+    if (!wines.length) return wines
+    setEnriching(true); setEnrichProgress(0)
+    const webSearchTool = [{ type: 'web_search_20250305', name: 'web_search' }]
+    const result = [...wines]
+    const toEnrich = result.filter(w => !w._enriched && w.name && w.name !== '미확인')
+    for (let i = 0; i < toEnrich.length; i++) {
+      const w = toEnrich[i]
+      try {
+        const q = w.vintage ? `${w.name} ${w.vintage}` : w.name
+        const data = await callVisionAPI([{ role: 'user', content:
+          `와인 "${q}"을 웹에서 검색하여 Vivino, Wine-Searcher, 와인나라 등에서 정보를 수집하고, 아래 JSON 형식으로만 반환하세요 (마크다운 없이, 설명 없이):
+{"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종","description":"이 와인을 한국어로 2문장 설명","imageUrl":"","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
+
+- wineSearcherPrice: 한국 시장가 KRW 숫자만 (예: 1100000)
+- vivinoPrice: 글로벌 USD 숫자만 (예: 634)
+- vivinoRating: Vivino 평점 숫자만 (예: 4.5)
+모르는 필드는 null로 두세요.` }],
+          1500, webSearchTool)
+        const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
+        console.log(`[Enrich] ${q}:`, text)
+        const cleaned = text.replace(/```json|```/g, '').trim()
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
+        const info = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
+        const idx = result.findIndex(x => x._id === w._id)
+        if (idx !== -1) result[idx] = { ...result[idx], ...info, _enriched: true }
+        setWineList([...result])
+      } catch (err) {
+        console.error(`[Enrich] ${w.name} 실패:`, err)
+      }
+      setEnrichProgress(Math.round((i + 1) / toEnrich.length * 100))
+    }
+    setEnriching(false)
+    return result
+  }
+
   async function handleFiles(e) {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
@@ -269,6 +306,7 @@ export function BulkImportModal({ onAddMany, onClose }) {
 
     const newPhotos = files.map(f => ({ id: uid(), file: f, dataUrl: null, status: 'pending' }))
     setPhotos(p => [...p, ...newPhotos])
+    let newlyFound = []
     for (const ph of newPhotos) {
       const { dataUrl, base64 } = await resizeForVision(ph.file)
       setPhotos(p => p.map(x => x.id === ph.id ? { ...x, dataUrl, status: 'scanning' } : x))
@@ -290,9 +328,8 @@ export function BulkImportModal({ onAddMany, onClose }) {
         ]}], 3000)
 
         const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '[]'
-        console.log('[Vision] Raw response:', text) // 디버그용
+        console.log('[Vision] Raw response:', text)
 
-        // JSON 추출 — 코드블록 포함 다양한 형식 처리
         const cleaned = text.replace(/```json|```/g, '').trim()
         const match = cleaned.match(/\[[\s\S]*\]/)
         if (!match) throw new Error(`JSON 배열 없음: ${text.slice(0, 100)}`)
@@ -305,6 +342,7 @@ export function BulkImportModal({ onAddMany, onClose }) {
           qty: w.qty || 1, cellarId, slot, price: '', purchaseDate: '',
           imageUrl: '', notes: '', _enriched: false
         }))
+        newlyFound = [...newlyFound, ...withMeta]
         setWineList(p => [...p, ...withMeta])
         setPhotos(p => p.map(x => x.id === ph.id ? { ...x, status: 'done', count: found.length } : x))
       } catch (err) {
@@ -316,39 +354,17 @@ export function BulkImportModal({ onAddMany, onClose }) {
       }
     }
     e.target.value = ''
+
+    // 모든 사진 처리 완료 → 자동으로 step3 이동 + 가격 정보 자동 검색
+    if (newlyFound.length > 0) {
+      setStep(3)
+      await enrichWines(newlyFound)
+    }
   }
 
   async function runEnrich() {
-    setEnriching(true); setEnrichProgress(0)
-    const toEnrich = wineList.filter(w => !w._enriched && w.name && w.name !== '미확인')
-    const webSearchTool = [{ type: 'web_search_20250305', name: 'web_search' }]
-    for (let i = 0; i < toEnrich.length; i++) {
-      const w = toEnrich[i]
-      try {
-        const q = w.vintage ? `${w.name} ${w.vintage}` : w.name
-        const data = await callVisionAPI([{ role: 'user', content:
-          `와인 "${q}"을 웹에서 검색하여 Vivino, Wine-Searcher, 와인나라 등에서 정보를 수집하고, 아래 JSON 형식으로만 반환하세요 (마크다운 없이, 설명 없이):
-{"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종","description":"이 와인을 한국어로 2문장 설명","imageUrl":"","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
-
-- wineSearcherPrice: 한국 시장가 KRW 숫자만 (예: 1100000)
-- vivinoPrice: 글로벌 USD 숫자만 (예: 634)
-- vivinoRating: Vivino 평점 숫자만 (예: 4.5)
-모르는 필드는 null로 두세요.` }],
-          1500, webSearchTool)
-
-        // 웹검색 후 text 블록만 추출
-        const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
-        console.log(`[Enrich] ${q}:`, text)
-        const cleaned = text.replace(/```json|```/g, '').trim()
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
-        const info = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
-        setWineList(p => p.map(x => x._id === w._id ? { ...x, ...info, _enriched: true } : x))
-      } catch (err) {
-        console.error(`[Enrich] ${w.name} 실패:`, err)
-      }
-      setEnrichProgress(Math.round((i + 1) / toEnrich.length * 100))
-    }
-    setEnriching(false)
+    const current = wineList.filter(w => !w._enriched && w.name && w.name !== '미확인')
+    await enrichWines(current)
   }
 
   const setField = (id, k, v) => setWineList(p => p.map(w => w._id === id ? { ...w, [k]: v } : w))
@@ -433,7 +449,7 @@ export function BulkImportModal({ onAddMany, onClose }) {
                 <span style={{ color: T.gold }}> {cellarById(cellarId)?.name} · {slot}번 칸</span>
               </div>
               <button onClick={runEnrich} disabled={enriching} style={{ background: enriching ? T.muted : T.surface, color: enriching ? T.bg : T.gold, border: `1px solid ${T.gold}44`, cursor: enriching ? 'not-allowed' : 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: '0.78rem' }}>
-                {enriching ? `🔍 검색 중... ${enrichProgress}%` : '🔍 AI로 가격·정보 검색'}
+                {enriching ? `🔍 가격 검색 중... ${enrichProgress}%` : '🔄 가격·정보 다시 검색'}
               </button>
             </div>
             <div style={{ maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
