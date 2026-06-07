@@ -91,6 +91,15 @@ vivino USD 원본 → vivinoPrice
           <div><label style={lbl}>구매가격 (₩)</label><input value={form.price || ''} onChange={e => setF('price', e.target.value)} type="number" /></div>
         </div>
         <div style={G}>
+          <div><label style={lbl}>시장가 (₩) <span style={{ color: T.gold, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>Wine-Searcher·데일리샷 기준</span></label><input value={form.wineSearcherPrice || ''} onChange={e => setF('wineSearcherPrice', parseInt(e.target.value) || null)} type="number" placeholder="예: 1500000" /></div>
+          <div><label style={lbl}>Vivino 가격 ($) / 평점</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input value={form.vivinoPrice || ''} onChange={e => setF('vivinoPrice', parseFloat(e.target.value) || null)} type="number" placeholder="USD" style={{ flex: 1 }} />
+              <input value={form.vivinoRating || ''} onChange={e => setF('vivinoRating', parseFloat(e.target.value) || null)} type="number" placeholder="평점" step="0.1" min="0" max="5" style={{ width: 70 }} />
+            </div>
+          </div>
+        </div>
+        <div style={G}>
           <div>
             <label style={lbl}>셀러</label>
             <select value={form.cellarId} onChange={e => { setF('cellarId', e.target.value); setF('slot', '1') }}>
