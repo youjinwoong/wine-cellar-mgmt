@@ -224,9 +224,11 @@ async function resizeForVision(file) {
 }
 
 // Anthropic API 직접 호출 (cellars.js callAI 우회 — API 키 문제 방어)
-async function callVisionAPI(messages, maxTokens = 2000) {
+async function callVisionAPI(messages, maxTokens = 2000, tools = null) {
   const key = localStorage.getItem('cave_anthropic_key')?.trim()
   if (!key) throw new Error('API 키 없음')
+  const body = { model: 'claude-opus-4-5', max_tokens: maxTokens, messages }
+  if (tools) body.tools = tools
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -235,7 +237,7 @@ async function callVisionAPI(messages, maxTokens = 2000) {
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: maxTokens, messages })
+    body: JSON.stringify(body)
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -319,18 +321,22 @@ export function BulkImportModal({ onAddMany, onClose }) {
   async function runEnrich() {
     setEnriching(true); setEnrichProgress(0)
     const toEnrich = wineList.filter(w => !w._enriched && w.name && w.name !== '미확인')
+    const webSearchTool = [{ type: 'web_search_20250305', name: 'web_search' }]
     for (let i = 0; i < toEnrich.length; i++) {
       const w = toEnrich[i]
       try {
         const q = w.vintage ? `${w.name} ${w.vintage}` : w.name
         const data = await callVisionAPI([{ role: 'user', content:
-          `와인 "${q}"의 정보를 검색해서 아래 JSON 형식으로만 반환하세요 (마크다운 없이, 설명 없이):
-{"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종(Cabernet Sauvignon 등)","description":"이 와인을 한국어로 2문장 설명","imageUrl":"","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
+          `와인 "${q}"을 웹에서 검색하여 Vivino, Wine-Searcher, 와인나라 등에서 정보를 수집하고, 아래 JSON 형식으로만 반환하세요 (마크다운 없이, 설명 없이):
+{"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종","description":"이 와인을 한국어로 2문장 설명","imageUrl":"","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
 
-- wineSearcherPrice: 한국 시장가 KRW 숫자 (없으면 null)
-- vivinoPrice: 글로벌 USD 숫자 (없으면 null)
-- vivinoRating: Vivino 평점 숫자 (없으면 null)
-잘 모르는 필드는 null이나 빈 문자열로 두세요.` }], 1000)
+- wineSearcherPrice: 한국 시장가 KRW 숫자만 (예: 1100000)
+- vivinoPrice: 글로벌 USD 숫자만 (예: 634)
+- vivinoRating: Vivino 평점 숫자만 (예: 4.5)
+모르는 필드는 null로 두세요.` }],
+          1500, webSearchTool)
+
+        // 웹검색 후 text 블록만 추출
         const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
         console.log(`[Enrich] ${q}:`, text)
         const cleaned = text.replace(/```json|```/g, '').trim()
