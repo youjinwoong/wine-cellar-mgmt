@@ -17,6 +17,20 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
   const tooYoung  = wines.filter(w => { const s = getDrinkingStatus(w); return s?.status === 'young' })
   const lowStock  = wines.filter(w => (w.qty || 1) <= 1)
 
+  // 빨리 마셔야 하는 와인: 절정 지남 또는 절정 종료 2년 이내
+  const urgentDrink = wines.filter(w => {
+    const s = getDrinkingStatus(w)
+    if (!s) return false
+    if (s.status === 'decline') return true
+    if (s.status === 'peak' && s.to && (s.to - year) <= 2) return true
+    return false
+  }).sort((a, b) => {
+    const sa = getDrinkingStatus(a), sb = getDrinkingStatus(b)
+    if (sa.status === 'decline' && sb.status !== 'decline') return -1
+    if (sb.status === 'decline' && sa.status !== 'decline') return 1
+    return (sa.to || 9999) - (sb.to || 9999)
+  })
+
   // 추천 와인 (지금 마시기 좋은 것 중 빈티지 오래된 순)
   const recommended = [...drinkNow].sort((a, b) => (a.vintage || 0) - (b.vintage || 0)).slice(0, 3)
 
@@ -61,6 +75,32 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
                 <div style={{ fontSize:'1rem', fontWeight:700, color:'#4a8a5e' }}>+{krw(marketValue - purchaseValue)}</div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 빨리 마셔야 하는 와인 */}
+      {urgentDrink.length > 0 && (
+        <div style={{ background:'#8B1A1A18', border:'1px solid #c0392b66', borderRadius:12, padding:16, marginBottom:24 }}>
+          <div style={{ fontSize:'0.72rem', color:'#e74c3c', fontWeight:600, marginBottom:10 }}>🚨 빨리 마셔야 하는 와인 ({urgentDrink.length}종)</div>
+          <div style={{ maxHeight:200, overflowY:'auto' }}>
+            {urgentDrink.map(w => {
+              const s = getDrinkingStatus(w)
+              return (
+                <div key={w.id} onClick={() => openDetail && openDetail(w.id)} style={{ fontSize:'0.8rem', color:T.cream, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0', borderBottom:`1px solid ${T.border}`, cursor:'pointer', transition:'color 0.15s' }}
+                  onMouseEnter={e=>e.currentTarget.style.color='#e74c3c'}
+                  onMouseLeave={e=>e.currentTarget.style.color=T.cream}
+                >
+                  <span>{w.name}</span>
+                  <div style={{ display:'flex', gap:8, alignItems:'center', flexShrink:0, marginLeft:8 }}>
+                    <span style={{ fontSize:'0.7rem', color:s.status==='decline'?'#e74c3c':'#e67e22', background:s.status==='decline'?'#e74c3c22':'#e67e2222', borderRadius:4, padding:'1px 6px' }}>
+                      {s.status === 'decline' ? '절정 지남' : `${s.to}년까지`}
+                    </span>
+                    <span style={{ color:T.gold }}>{w.vintage}</span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
