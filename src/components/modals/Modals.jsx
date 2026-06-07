@@ -28,8 +28,8 @@ export function DetailModal({ wine, onClose, onDrink, onRemove, onUpdate, goSlot
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1000,
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1500,
           tools: [{ type: 'web_search_20250305', name: 'web_search' }],
           messages: [{ role: 'user', content:
             `와인 "${q}"의 정보를 웹에서 검색하여 JSON만 반환 (마크다운 없이):
@@ -340,11 +340,11 @@ async function resizeForVision(file) {
 }
 
 // Anthropic API 직접 호출 (cellars.js callAI 우회 — API 키 문제 방어)
-// vision=true: 이미지 분석용 sonnet, false: 텍스트 검색용 haiku
+// 모든 검색에 sonnet 사용 (가격 정확도 향상)
 async function callVisionAPI(messages, maxTokens = 2000, tools = null, vision = false) {
   const key = localStorage.getItem('cave_anthropic_key')?.trim()
   if (!key) throw new Error('API 키 없음')
-  const model = vision ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001'
+  const model = 'claude-sonnet-4-6'
   const body = { model, max_tokens: maxTokens, messages }
   if (tools) body.tools = tools
   const res = await fetch('https://api.anthropic.com/v1/messages', {
