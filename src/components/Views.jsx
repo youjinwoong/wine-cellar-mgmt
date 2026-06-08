@@ -115,8 +115,9 @@ export function SearchView({ wines, openDetail, openDrink, goSlot }) {
                       {w.vintage && <span style={{ color: T.gold }}>{w.vintage}</span>}
                       <span>{w.qty || 1}병</span>
                       {w.price > 0 && <span>{krw(w.price)}</span>}
+                      {w.wineSearcherPrice > 0 && <span style={{ color: T.gold, fontWeight: 600 }}>시장가 {krw(w.wineSearcherPrice)}</span>}
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: T.muted, marginTop: 2 }}>{c?.name} 셀러 {w.slot}번 칸</div>
+                    <div style={{ fontSize: '0.68rem', color: T.muted, marginTop: 2 }}>{c?.name} · {w.slot}번 칸</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                     <button onClick={() => openDrink(w)} style={{ background: T.wine + '33', color: T.wineLight, border: `1px solid ${T.wine}`, padding: '6px 10px', borderRadius: 8, fontSize: '0.75rem', cursor: 'pointer' }}>마심</button>
@@ -200,7 +201,7 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
             'anthropic-dangerous-direct-browser-access': 'true',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-6',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 800,
             tools: [{ type: 'web_search_20250305', name: 'web_search' }],
             messages: [{ role: 'user', content:
