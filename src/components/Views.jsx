@@ -115,9 +115,8 @@ export function SearchView({ wines, openDetail, openDrink, goSlot }) {
                       {w.vintage && <span style={{ color: T.gold }}>{w.vintage}</span>}
                       <span>{w.qty || 1}병</span>
                       {w.price > 0 && <span>{krw(w.price)}</span>}
-                      {w.wineSearcherPrice > 0 && <span style={{ color: T.gold, fontWeight: 600 }}>시장가 {krw(w.wineSearcherPrice)}</span>}
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: T.muted, marginTop: 2 }}>{c?.name} · {w.slot}번 칸</div>
+                    <div style={{ fontSize: '0.68rem', color: T.muted, marginTop: 2 }}>{c?.name} 셀러 {w.slot}번 칸</div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                     <button onClick={() => openDrink(w)} style={{ background: T.wine + '33', color: T.wineLight, border: `1px solid ${T.wine}`, padding: '6px 10px', borderRadius: 8, fontSize: '0.75rem', cursor: 'pointer' }}>마심</button>
@@ -239,7 +238,7 @@ vivino USD 원본 → vivinoPrice
     setTimeout(() => setPriceUpdateDone(false), 4000)
   }
 
-  const COLS = '28px 48px 2fr 72px 56px 120px 120px 96px'
+  const COLS = '28px 48px 1.6fr 72px 56px 140px 130px'
 
   return (
     <div className="fade-in">
@@ -335,9 +334,8 @@ vivino USD 원본 → vivinoPrice
                 <span>이름</span>
                 <span style={{ textAlign: 'center' }}>빈티지</span>
                 <span style={{ textAlign: 'right' }}>수량</span>
-                <span style={{ textAlign: 'right' }}>구매가</span>
                 <span style={{ textAlign: 'right', color: '#C9A84C' }}>시장가(₩)</span>
-                <span>위치</span>
+                <span>셀러 · 위치</span>
               </div>
               {sorted.map(w => {
                 const c = cellarById(w.cellarId)
@@ -360,11 +358,16 @@ vivino USD 원본 → vivinoPrice
                     </div>
                     <span style={{ fontSize: '0.875rem', color: T.gold, fontWeight: 500, textAlign: 'center' }}>{w.vintage || '??'}</span>
                     <span style={{ fontSize: '0.875rem', color: T.text, textAlign: 'right' }}>{w.qty || 1}병</span>
-                    <span style={{ fontSize: '0.875rem', color: T.text, textAlign: 'right' }}>{krw(w.price) || '-'}</span>
                     <span style={{ fontSize: '0.875rem', color: w.wineSearcherPrice ? T.gold : T.muted, fontWeight: w.wineSearcherPrice ? 600 : 400, textAlign: 'right' }}>{w.wineSearcherPrice ? krw(w.wineSearcherPrice) : '-'}</span>
-                    <div onClick={e => { e.stopPropagation(); goSlot(w.cellarId, w.slot) }} style={{ cursor: 'pointer' }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: T.cream }}>{c?.name}</div>
-                      <div style={{ fontSize: '0.68rem', color: T.muted }}>{w.slot}번 칸</div>
+                    <div onClick={e => { e.stopPropagation(); goSlot(w.cellarId, w.slot) }} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, background: T.surface, borderRadius: 8, padding: '5px 10px', border: `1px solid ${T.border}`, transition: 'border-color 0.15s' }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = T.gold}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
+                    >
+                      <div style={{ fontSize: '0.9rem' }}>📍</div>
+                      <div>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 600, color: T.cream, whiteSpace: 'nowrap' }}>{c?.name}</div>
+                        <div style={{ fontSize: '0.65rem', color: T.gold }}>{w.slot}번 칸</div>
+                      </div>
                     </div>
                   </div>
                 )
