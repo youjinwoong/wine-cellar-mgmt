@@ -341,27 +341,37 @@ async function resizeForVision(file) {
 
 // Anthropic API 직접 호출 (cellars.js callAI 우회 — API 키 문제 방어)
 // 이미지 분석·가격검색 모두 claude-sonnet-4-6으로 통일
+// 웹 검색 사용 시 pause_turn이 오면 대화를 이어서 자동 재호출 (최대 4회)
 async function callVisionAPI(messages, maxTokens = 2000, tools = null, vision = false) {
   const key = localStorage.getItem('cave_anthropic_key')?.trim()
   if (!key) throw new Error('API 키 없음')
   const model = 'claude-sonnet-4-6'
-  const body = { model, max_tokens: maxTokens, messages }
-  if (tools) body.tools = tools
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify(body)
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err?.error?.message || `HTTP ${res.status}`)
+  let msgs = messages
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const body = { model, max_tokens: maxTokens, messages: msgs }
+    if (tools) body.tools = tools
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(body)
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err?.error?.message || `HTTP ${res.status}`)
+    }
+    const data = await res.json()
+    if (data.stop_reason === 'pause_turn') {
+      msgs = [...msgs, { role: 'assistant', content: data.content }]
+      continue
+    }
+    return data
   }
-  return res.json()
+  throw new Error('웹 검색이 완료되지 않음 (pause_turn 반복)')
 }
 
 export function BulkImportModal({ onAddMany, onClose }) {
@@ -401,12 +411,16 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
 - vivinoPrice: USD 숫자만, vivino 원본 (예: 634)
 - vivinoRating: Vivino 평점 숫자만 (예: 4.5)
 - 모르는 필드는 null로 두세요.` }],
-          1500, webSearchTool)
+          2000, webSearchTool)
         const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
         console.log(`[Enrich] ${q}:`, text)
         const cleaned = text.replace(/```json|```/g, '').trim()
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/)
-        const info = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
+        // 완성된 JSON 객체들 중 마지막 것을 사용 (앞쪽 설명 텍스트 무시)
+        const candidates = cleaned.match(/\{[^{}]*\}/g) || []
+        let info = {}
+        for (let k = candidates.length - 1; k >= 0; k--) {
+          try { info = JSON.parse(candidates[k]); break } catch { /* 다음 후보 */ }
+        }
         const idx = result.findIndex(x => x._id === w._id)
         if (idx !== -1) result[idx] = { ...result[idx], ...info, _enriched: true }
         setWineList([...result])
