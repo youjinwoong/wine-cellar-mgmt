@@ -176,6 +176,62 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
     setConfirmBulkDelete(false)
   }
 
+  // 단일 와인 가격 검색 — pause_turn 이어가기 + 견고한 JSON 추출
+  async function searchOnePrice(apiKey, q) {
+    const prompt = `와인 "${q}"의 가격을 검색하여 JSON만 반환 (마크다운 없이):
+{"wineSearcherPrice":null,"vivinoPrice":null,"vivinoRating":null}
+
+가격 수집 방법 (750ml 기준):
+- wine-searcher.com 한국(Korea) KRW 가격 조회
+- dailyshot.co.kr KRW 가격 조회
+- vivino.com USD 가격 조회 후 현재 환율로 KRW 환산
+
+세 가격 중 가장 높은 KRW → wineSearcherPrice
+vivino USD 원본 → vivinoPrice
+숫자만, 모르면 null
+응답의 마지막은 반드시 완성된 JSON 객체 하나여야 한다.`
+    let messages = [{ role: 'user', content: prompt }]
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2000,
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+          messages,
+        })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error?.message || `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      // 웹 검색 중 턴이 일시정지되면 대화를 이어서 재호출
+      if (data.stop_reason === 'pause_turn') {
+        messages = [...messages, { role: 'assistant', content: data.content }]
+        continue
+      }
+      const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('')
+      const cleaned = text.replace(/\`\`\`json|\`\`\`/g, '').trim()
+      // 완성된 JSON 객체들 중 마지막 것을 사용 (앞쪽 설명 텍스트 무시)
+      const candidates = cleaned.match(/\{[^{}]*\}/g)
+      if (candidates) {
+        for (let i = candidates.length - 1; i >= 0; i--) {
+          try { return JSON.parse(candidates[i]) } catch { /* 다음 후보 */ }
+        }
+      }
+      console.warn('[PriceUpdate] JSON 추출 실패. stop_reason:', data.stop_reason, '응답:', text.slice(0, 300))
+      return null
+    }
+    return null
+  }
+
   async function handleBulkPriceUpdate(forceAll = false) {
     const targets = forceAll ? sorted : sorted.filter(w => !w.wineSearcherPrice)
     if (targets.length === 0) {
@@ -186,55 +242,28 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
     if (!apiKey) { alert('⚙️ 설정에서 Claude API 키를 먼저 입력해주세요!'); return }
     setPriceUpdating(true)
     setPriceUpdateDone(false)
+    let ok = 0, fail = 0
     for (let i = 0; i < targets.length; i++) {
       const w = targets[i]
       setPriceProgress({ current: i + 1, total: targets.length, name: w.name })
       try {
         const q = w.vintage ? `${w.name} ${w.vintage}` : w.name
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 800,
-            tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-            messages: [{ role: 'user', content:
-              `와인 "${q}"의 가격을 검색하여 JSON만 반환 (마크다운 없이):
-와인 "${q}"의 가격을 검색하여 JSON만 반환 (마크다운 없이):
-{"wineSearcherPrice":null,"vivinoPrice":null,"vivinoRating":null}
-
-가격 수집 방법 (750ml 기준):
-- wine-searcher.com 한국(Korea) KRW 가격 조회
-- dailyshot.co.kr KRW 가격 조회
-- vivino.com USD 가격 조회 후 현재 환율로 KRW 환산
-
-세 가격 중 가장 높은 KRW → wineSearcherPrice
-vivino USD 원본 → vivinoPrice
-숫자만, 모르면 null` }]
-          })
-        })
-        const data = await res.json()
-        const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
-        const cleaned = text.replace(/\`\`\`json|\`\`\`/g, '').trim()
-        const match = cleaned.match(/\{[\s\S]*\}/)
-        if (match) {
-          const info = JSON.parse(match[0])
-          if (info.wineSearcherPrice || info.vivinoPrice) {
-            // App.jsx의 updateWine 대신 직접 wines 배열 업데이트를 위해 onUpdate 필요
-            // wines prop을 통해 직접 업데이트할 수 없으므로 커스텀 이벤트로 처리
-            window.dispatchEvent(new CustomEvent('cave:priceUpdate', { detail: { id: w.id, ...info } }))
-          }
+        const info = await searchOnePrice(apiKey, q)
+        if (info && (info.wineSearcherPrice || info.vivinoPrice || info.vivinoRating)) {
+          // App.jsx의 updateWine 대신 직접 wines 배열 업데이트를 위해 onUpdate 필요
+          // wines prop을 통해 직접 업데이트할 수 없으므로 커스텀 이벤트로 처리
+          window.dispatchEvent(new CustomEvent('cave:priceUpdate', { detail: { id: w.id, ...info } }))
+          ok++
+        } else {
+          fail++
+          console.warn('[PriceUpdate] 가격 못 찾음:', w.name)
         }
-      } catch(e) { console.error('[PriceUpdate]', w.name, e) }
+      } catch(e) { fail++; console.error('[PriceUpdate]', w.name, e) }
       await new Promise(r => setTimeout(r, 2000))
     }
     setPriceUpdating(false)
     setPriceUpdateDone(true)
+    if (fail > 0) alert(`시장가 업데이트: 성공 ${ok}건 / 실패 ${fail}건\n실패 목록은 브라우저 콘솔(F12)에서 확인할 수 있습니다.`)
     setTimeout(() => setPriceUpdateDone(false), 4000)
   }
 

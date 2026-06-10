@@ -2,11 +2,45 @@ import { useState } from 'react'
 import { CELLARS, getSlots, cellarById, T, krw, getDrinkingStatus } from '../config/cellars.js'
 import { Btn, useIsMobile } from './ui.jsx'
 
-export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCellarId, openAdd, openDetail, onDrink }) {
+export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCellarId, openAdd, openDetail, onDrink, onDeleteMany }) {
   const [expanded, setExpanded] = useState(null)
+  const [selected, setSelected] = useState(new Set())
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const mobile = useIsMobile()
   const c = cellarById(cellarId)
   const slots = getSlots(c)
+
+  const cellarWines = wines.filter(w => w.cellarId === cellarId)
+  const allIds = cellarWines.map(w => w.id)
+  const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id))
+  const someSelected = selected.size > 0
+
+  function toggleSelect(id, e) {
+    e.stopPropagation()
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(allIds))
+    }
+  }
+
+  function clearSelection() {
+    setSelected(new Set())
+    setConfirmDelete(false)
+  }
+
+  async function handleDeleteSelected() {
+    await onDeleteMany([...selected])
+    clearSelection()
+  }
 
   return (
     <div className="fade-in">
@@ -15,7 +49,7 @@ export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCel
       {/* Cellar tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         {CELLARS.map(cc => (
-          <button key={cc.id} onClick={() => { setCellarId(cc.id); setExpanded(null) }} style={{
+          <button key={cc.id} onClick={() => { setCellarId(cc.id); setExpanded(null); clearSelection() }} style={{
             background: cc.id === cellarId ? T.gold : 'transparent',
             color: cc.id === cellarId ? T.bg : T.muted,
             border: cc.id === cellarId ? 'none' : `1px solid ${T.border}`,
@@ -45,6 +79,33 @@ export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCel
         })()}
       </div>
 
+      {/* 다중 선택 툴바 */}
+      {someSelected && (
+        <div style={{ background: T.card, border: `1px solid ${T.gold}66`, borderRadius: 10, padding: '10px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <input type="checkbox" checked={allSelected} onChange={toggleAll}
+              style={{ width: 16, height: 16, accentColor: T.gold, cursor: 'pointer' }} />
+            <span style={{ fontSize: '0.85rem', color: T.cream }}>
+              <strong style={{ color: T.gold }}>{selected.size}개</strong> 선택됨
+            </span>
+            <button onClick={clearSelection} style={{ background: 'none', border: 'none', color: T.muted, fontSize: '0.78rem', cursor: 'pointer', textDecoration: 'underline' }}>선택 해제</button>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {confirmDelete ? (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: '#c0392b22', border: '1px solid #c0392b', borderRadius: 8, padding: '4px 10px' }}>
+                <span style={{ fontSize: '0.78rem', color: '#e07070' }}>{selected.size}개 삭제?</span>
+                <button onClick={handleDeleteSelected} style={{ background: '#c0392b', color: 'white', border: 'none', borderRadius: 6, padding: '3px 10px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}>확인</button>
+                <button onClick={() => setConfirmDelete(false)} style={{ background: 'transparent', border: `1px solid ${T.border}`, color: T.muted, borderRadius: 6, padding: '3px 8px', fontSize: '0.78rem', cursor: 'pointer' }}>취소</button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmDelete(true)} style={{ background: '#c0392b22', border: '1px solid #c0392b88', color: '#e07070', borderRadius: 8, padding: '6px 14px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600 }}>
+                🗑 선택 삭제
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Rack rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {slots.map(slot => {
@@ -52,6 +113,8 @@ export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCel
           const ratio = b / c.maxPerSlot
           const isOpen = expanded === slot
           const slotWines = winesIn(cellarId, slot)
+          const slotAllSelected = slotWines.length > 0 && slotWines.every(w => selected.has(w.id))
+          const slotSomeSelected = slotWines.some(w => selected.has(w.id))
 
           return (
             <div key={slot} style={{ background: T.card, border: `1px solid ${isOpen ? T.gold + '88' : T.border}`, borderRadius: 10, overflow: 'hidden', transition: 'border-color 0.2s' }}>
@@ -66,6 +129,11 @@ export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCel
                       {b > 0 ? slotWines.map(w => w.name).join(' · ').substring(0, 50) + (slotWines.map(w => w.name).join('·').length > 50 ? '...' : '') : '비어있음'}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 8 }}>
+                      {slotSomeSelected && (
+                        <span style={{ fontSize: '0.72rem', color: T.gold, background: T.gold + '22', borderRadius: 4, padding: '1px 6px' }}>
+                          {slotWines.filter(w => selected.has(w.id)).length}선택
+                        </span>
+                      )}
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, color: ratio >= 0.85 ? T.wineLight : ratio > 0 ? T.gold : T.muted }}>{b}/{c.maxPerSlot}병</span>
                       <span style={{ color: T.muted, fontSize: '0.85rem' }}>{isOpen ? '▲' : '▼'}</span>
                     </div>
@@ -84,32 +152,55 @@ export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCel
               {/* Wine list */}
               {isOpen && (
                 <div className="slide-down" style={{ borderTop: `1px solid ${T.border}`, padding: '8px 0' }}>
+                  {/* 칸 전체 선택 */}
+                  {slotWines.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 18px 8px', borderBottom: `1px solid ${T.border}` }}>
+                      <input type="checkbox" checked={slotAllSelected} onChange={e => {
+                        e.stopPropagation()
+                        setSelected(prev => {
+                          const next = new Set(prev)
+                          if (slotAllSelected) slotWines.forEach(w => next.delete(w.id))
+                          else slotWines.forEach(w => next.add(w.id))
+                          return next
+                        })
+                      }} style={{ width: 14, height: 14, accentColor: T.gold, cursor: 'pointer' }} />
+                      <span style={{ fontSize: '0.72rem', color: T.muted }}>{slot}번 칸 전체 선택</span>
+                    </div>
+                  )}
                   {slotWines.length === 0 ? (
                     <div style={{ padding: '16px 18px', color: T.muted, fontSize: '0.85rem', textAlign: 'center' }}>빈 칸 — 위의 + 추가 버튼으로 와인을 등록하세요</div>
-                  ) : slotWines.map(w => (
-                    <div key={w.id} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 18px', transition: 'background 0.12s', cursor: 'pointer' }}
-                      onMouseEnter={e => e.currentTarget.style.background = T.cardHover}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      onClick={() => openDetail(w.id)}
-                    >
-                      {w.imageUrl
-                        ? <img src={w.imageUrl} alt="" style={{ width: 32, height: 46, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
-                        : <div style={{ width: 32, height: 46, background: T.surface, borderRadius: 4, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', border: `1px solid ${T.border}` }}>🍷</div>
-                      }
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 500, color: T.cream, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: T.muted, marginTop: 2 }}>
-                          {w.vintage && <span style={{ color: T.gold, marginRight: 8 }}>{w.vintage}</span>}
-                          <span style={{ marginRight: 8 }}>{w.qty || 1}병</span>
-                          <span>{krw(w.price)}</span>
+                  ) : slotWines.map(w => {
+                    const isSelected = selected.has(w.id)
+                    return (
+                      <div key={w.id}
+                        style={{ display: 'flex', gap: 12, alignItems: 'center', padding: '10px 18px', transition: 'background 0.12s', cursor: 'pointer', background: isSelected ? T.gold + '11' : 'transparent', borderLeft: isSelected ? `2px solid ${T.gold}` : '2px solid transparent' }}
+                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = T.cardHover }}
+                        onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
+                        onClick={() => openDetail(w.id)}
+                      >
+                        {/* 체크박스 */}
+                        <input type="checkbox" checked={isSelected} onChange={e => toggleSelect(w.id, e)}
+                          onClick={e => e.stopPropagation()}
+                          style={{ width: 15, height: 15, accentColor: T.gold, cursor: 'pointer', flexShrink: 0 }} />
+                        {w.imageUrl
+                          ? <img src={w.imageUrl} alt="" style={{ width: 32, height: 46, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} />
+                          : <div style={{ width: 32, height: 46, background: T.surface, borderRadius: 4, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', border: `1px solid ${T.border}` }}>🍷</div>
+                        }
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 500, color: T.cream, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
+                          <div style={{ fontSize: '0.75rem', color: T.muted, marginTop: 2 }}>
+                            {w.vintage && <span style={{ color: T.gold, marginRight: 8 }}>{w.vintage}</span>}
+                            <span style={{ marginRight: 8 }}>{w.qty || 1}병</span>
+                            <span>{krw(w.price)}</span>
+                          </div>
                         </div>
+                        <button onClick={e => { e.stopPropagation(); onDrink(w) }}
+                          style={{ background: T.wine + '33', border: `1px solid ${T.wine}`, color: T.wineLight, cursor: 'pointer', borderRadius: 6, padding: '5px 10px', fontSize: '0.75rem', flexShrink: 0 }}>
+                          마심
+                        </button>
                       </div>
-                      <button onClick={e => { e.stopPropagation(); onDrink(w) }}
-                        style={{ background: T.wine + '33', border: `1px solid ${T.wine}`, color: T.wineLight, cursor: 'pointer', borderRadius: 6, padding: '5px 10px', fontSize: '0.75rem', flexShrink: 0 }}>
-                        마심
-                      </button>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
