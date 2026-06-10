@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CELLARS, getSlots, cellarById, T, uid, callAI } from '../../config/cellars.js'
+import { CELLARS, getSlots, cellarById, T, uid, krw, callAI } from '../../config/cellars.js'
 import { Btn, lbl, ImagePicker } from '../ui.jsx'
 
 export default function AddWineModal({ pre = {}, onAdd, onClose }) {
@@ -25,11 +25,28 @@ export default function AddWineModal({ pre = {}, onAdd, onClose }) {
       const q = form.vintage ? `${form.name} ${form.vintage}` : form.name
       const data = await callAI([{
         role: 'user',
-        content: `와인 "${q}"를 Vivino·Wine-Searcher에서 검색하고 JSON만 반환 (마크다운 없이):
-{"producer":"생산자","region":"지역","country":"국가","grape":"품종","description":"한국어 2문장","imageUrl":"이미지URL또는빈문자열","vivinoPrice":가격숫자또는null,"vivinoRating":평점숫자또는null,"wineSearcherPrice":750ml1병가격숫자또는null}`,
-      }], 700, [{ type: 'web_search_20250305', name: 'web_search' }])
+        content: `와인 "${q}"의 정보를 웹에서 검색하여 JSON만 반환 (마크다운 없이):
+{"producer":"생산자","region":"지역","country":"국가","grape":"품종","description":"한국어 2문장","imageUrl":"이미지URL또는빈문자열","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
+
+가격 수집 방법 (750ml 1병 기준):
+- wine-searcher.com 한국(Korea) KRW 가격 조회
+- dailyshot.co.kr KRW 가격 조회
+- vivino.com USD 가격 조회 후 현재 환율로 KRW 환산
+
+세 가격 중 가장 높은 KRW → wineSearcherPrice
+vivino USD 원본 → vivinoPrice
+숫자만, 모르면 null
+응답의 마지막은 반드시 완성된 JSON 객체 하나여야 한다.`,
+      }], 2000, [{ type: 'web_search_20250305', name: 'web_search' }])
       const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
-      const info = JSON.parse(text.replace(/```json|```/g, '').trim())
+      const cleaned = text.replace(/```json|```/g, '').trim()
+      // 완성된 JSON 객체들 중 마지막 것을 사용 (앞쪽 설명 텍스트 무시)
+      const candidates = cleaned.match(/\{[^{}]*\}/g) || []
+      let info = null
+      for (let k = candidates.length - 1; k >= 0; k--) {
+        try { info = JSON.parse(candidates[k]); break } catch { /* 다음 후보 */ }
+      }
+      if (!info) throw new Error(`JSON 추출 실패: ${text.slice(0, 100)}`)
       setAiInfo(info)
       if (info.imageUrl) { set('imageUrl', info.imageUrl); setImgSrc('ai'); setImgErr(false) }
       else setImgErr(true)
@@ -91,9 +108,8 @@ export default function AddWineModal({ pre = {}, onAdd, onClose }) {
             {(aiInfo.vivinoPrice || aiInfo.wineSearcherPrice) && (
               <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 8, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.72rem', color: T.muted, textTransform: 'uppercase' }}>시장가</span>
+                {aiInfo.wineSearcherPrice && <span style={{ fontSize: '0.78rem' }}>한국 시장가 <strong style={{ color: T.gold }}>{krw(aiInfo.wineSearcherPrice)}</strong></span>}
                 {aiInfo.vivinoPrice && <span style={{ fontSize: '0.78rem' }}>Vivino <strong style={{ color: T.cream }}>${aiInfo.vivinoPrice}</strong></span>}
-                {aiInfo.wineSearcherPrice && <span style={{ fontSize: '0.78rem' }}>Wine-Searcher <strong style={{ color: T.cream }}>${aiInfo.wineSearcherPrice}</strong></span>}
-                {aiInfo.vivinoPrice && aiInfo.wineSearcherPrice && <span style={{ fontSize: '0.78rem', color: T.gold, fontWeight: 600 }}>평균 ${Math.round((aiInfo.vivinoPrice + aiInfo.wineSearcherPrice) / 2)}</span>}
               </div>
             )}
             {aiInfo.description && <p style={{ color: T.text, fontStyle: 'italic', marginTop: 8, lineHeight: 1.5, fontSize: '0.78rem', borderLeft: `2px solid ${T.gold}`, paddingLeft: 8 }}>{aiInfo.description}</p>}
