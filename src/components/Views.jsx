@@ -114,13 +114,20 @@ export function SearchView({ wines, openDetail, openDrink, goSlot }) {
                     <div style={{ fontSize: '0.72rem', color: T.muted, marginTop: 3, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       {w.vintage && <span style={{ color: T.gold }}>{w.vintage}</span>}
                       <span>{w.qty || 1}병</span>
-                      {w.price > 0 && <span>{krw(w.price)}</span>}
+                      {w.price > 0 && <span>구매가 {krw(w.price)}</span>}
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: T.muted, marginTop: 2 }}>{c?.name} 셀러 {w.slot}번 칸</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => openDrink(w)} style={{ background: T.wine + '33', color: T.wineLight, border: `1px solid ${T.wine}`, padding: '6px 10px', borderRadius: 8, fontSize: '0.75rem', cursor: 'pointer' }}>마심</button>
-                    <button onClick={() => goSlot(w.cellarId, w.slot)} style={{ background: T.gold + '22', color: T.gold, border: `1px solid ${T.gold}44`, padding: '6px 12px', borderRadius: 8, fontSize: '0.75rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>📍 {c?.name} {w.slot}칸</button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 7, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    {w.wineSearcherPrice > 0
+                      ? <div style={{ fontSize: '0.95rem', fontWeight: 700, color: T.gold, lineHeight: 1 }}>
+                          <span style={{ fontSize: '0.62rem', fontWeight: 500, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: 6 }}>시장가</span>
+                          {krw(w.wineSearcherPrice)}
+                        </div>
+                      : <div style={{ fontSize: '0.7rem', color: T.muted }}>시장가 미등록</div>}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => openDrink(w)} style={{ background: T.wine + '33', color: T.wineLight, border: `1px solid ${T.wine}`, padding: '6px 10px', borderRadius: 8, fontSize: '0.75rem', cursor: 'pointer' }}>마심</button>
+                      <button onClick={() => goSlot(w.cellarId, w.slot)} style={{ background: T.gold + '33', color: T.gold, border: `1px solid ${T.gold}`, padding: '6px 12px', borderRadius: 8, fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>📍 {c?.name} {w.slot}칸</button>
+                    </div>
                   </div>
                 </div>
               )
