@@ -42,28 +42,44 @@ export function getDrinkingStatus(wine) {
 }
 
 // ── 이미지 압축 ──────────────────────────────────────────────────
+// EXIF 회전 보정 포함 (모바일 사진이 옆으로 눕는 문제 방지)
+// createImageBitmap + imageOrientation 지원 브라우저에서는 자동 보정,
+// 미지원 브라우저는 기존 FileReader 방식으로 폴백
 export async function compressImage(file, maxW = 320, quality = 0.75) {
-  return new Promise(resolve => {
-    const reader = new FileReader()
-    reader.onload = e => {
-      const img = new Image()
-      img.onload = () => {
-        const scale = Math.min(1, maxW / img.width)
-        const canvas = document.createElement('canvas')
-        canvas.width  = Math.round(img.width  * scale)
-        canvas.height = Math.round(img.height * scale)
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const scale  = Math.min(1, maxW / bitmap.width)
+    const canvas = document.createElement('canvas')
+    canvas.width  = Math.round(bitmap.width  * scale)
+    canvas.height = Math.round(bitmap.height * scale)
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+    return canvas.toDataURL('image/jpeg', quality)
+  } catch {
+    // 폴백: createImageBitmap 미지원 환경 (구형 브라우저)
+    return new Promise(resolve => {
+      const reader = new FileReader()
+      reader.onload = e => {
+        const img = new Image()
+        img.onload = () => {
+          const scale = Math.min(1, maxW / img.width)
+          const canvas = document.createElement('canvas')
+          canvas.width  = Math.round(img.width  * scale)
+          canvas.height = Math.round(img.height * scale)
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+          resolve(canvas.toDataURL('image/jpeg', quality))
+        }
+        img.src = e.target.result
       }
-      img.src = e.target.result
-    }
-    reader.readAsDataURL(file)
-  })
+      reader.readAsDataURL(file)
+    })
+  }
 }
 
 // ── Anthropic API ────────────────────────────────────────────────
 // 웹 검색 사용 시 pause_turn이 오면 대화를 이어서 자동 재호출 (최대 4회)
-export async function callAI(messages, maxTokens = 800, tools = null) {
+// maxTokens 기본값 2000: 800 이하는 JSON 잘림으로 조용한 실패 발생 (2026-06 확인)
+export async function callAI(messages, maxTokens = 2000, tools = null) {
   const apiKey = localStorage.getItem('cave_anthropic_key')
   if (!apiKey) throw new Error('API 키 없음')
   let msgs = messages
