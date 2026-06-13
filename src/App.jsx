@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { T, uid } from './config/cellars.js'
 import {
   loadWines, loadDrinkLog,
-  upsertWine, deleteWine, insertDrink, deleteDrink
+  upsertWine, deleteWine, insertDrink, deleteDrink,
+  signIn, getSession, onAuthChange
 } from './lib/supabase.js'
 
 import Header from './components/Header.jsx'
@@ -14,7 +15,50 @@ import { DetailModal, DrinkModal, SettingsModal, BulkImportModal } from './compo
 import { Toast } from './components/ui.jsx'
 import './index.css'
 
+// ── 로그인 화면 ──────────────────────────────────────────────────
+function LoginScreen({ onSignedIn }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit() {
+    if (!email.trim() || !password) return
+    setBusy(true); setErr('')
+    try {
+      await signIn(email.trim(), password)
+      onSignedIn()
+    } catch (e) {
+      setErr('로그인 실패 — 이메일/비밀번호를 확인하세요')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: T.bg, padding: 24 }}>
+      <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '2.4rem', color: T.gold, letterSpacing: '0.15em', marginBottom: 4 }}>CAVE</div>
+      <div style={{ color: T.muted, fontSize: '0.85rem', marginBottom: 32 }}>와인 셀러 관리</div>
+      <div style={{ width: '100%', maxWidth: 340, background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: 24 }}>
+        <label style={{ display: 'block', color: T.mutedMid, fontSize: '0.75rem', marginBottom: 6 }}>이메일</label>
+        <input value={email} onChange={e => setEmail(e.target.value)} type="email" autoComplete="username"
+          onKeyDown={e => e.key === 'Enter' && submit()}
+          style={{ width: '100%', marginBottom: 14, padding: '10px 12px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.cream, fontSize: '0.9rem' }} />
+        <label style={{ display: 'block', color: T.mutedMid, fontSize: '0.75rem', marginBottom: 6 }}>비밀번호</label>
+        <input value={password} onChange={e => setPassword(e.target.value)} type="password" autoComplete="current-password"
+          onKeyDown={e => e.key === 'Enter' && submit()}
+          style={{ width: '100%', marginBottom: 18, padding: '10px 12px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.cream, fontSize: '0.9rem' }} />
+        {err && <div style={{ color: T.wineLight, fontSize: '0.78rem', marginBottom: 14 }}>{err}</div>}
+        <button onClick={submit} disabled={busy || !email.trim() || !password}
+          style={{ width: '100%', padding: '11px', background: busy ? T.muted : T.gold, color: T.bg, border: 'none', borderRadius: 8, fontSize: '0.9rem', fontWeight: 600, cursor: busy ? 'not-allowed' : 'pointer', letterSpacing: '0.05em' }}>
+          {busy ? '로그인 중…' : '로그인'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
+  const [session, setSession]   = useState(undefined) // undefined=확인중, null=로그아웃, obj=로그인
   const [wines, setWines]       = useState([])
   const [drinkLog, setDrinkLog] = useState([])
   const [loading, setLoading]   = useState(true)
@@ -47,9 +91,18 @@ export default function App() {
     return () => window.removeEventListener('cave:priceUpdate', handler)
   }, [wines])
 
-  // ── Load data ────────────────────────────────────────────────
+  // ── 세션 확인 + 로그인 상태 구독 ───────────────────────────────
   useEffect(() => {
+    getSession().then(s => setSession(s ?? null))
+    const unsub = onAuthChange(s => setSession(s ?? null))
+    return unsub
+  }, [])
+
+  // ── Load data (로그인 후에만) ─────────────────────────────────
+  useEffect(() => {
+    if (!session) return
     async function init() {
+      setLoading(true)
       try {
         const [w, l] = await Promise.all([loadWines(), loadDrinkLog()])
         setWines(w); setDrinkLog(l)
@@ -62,7 +115,7 @@ export default function App() {
       setLoading(false)
     }
     init()
-  }, [])
+  }, [session])
 
   // ── Helpers ──────────────────────────────────────────────────
   const winesIn  = (cid, slot) => wines.filter(w => w.cellarId === cid && w.slot === slot)
@@ -138,6 +191,16 @@ export default function App() {
   const goSlot     = (cid, slot) => { setCellarId(cid); setTab('cellar') }
 
   const detailWine = modal?.type === 'detail' ? wines.find(w => w.id === modal.id) : null
+
+  // 세션 확인 중
+  if (session === undefined) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: T.bg, color: T.gold, fontFamily: 'Cormorant Garamond, serif', fontSize: '1.4rem', letterSpacing: '0.1em' }}>
+      🍷
+    </div>
+  )
+
+  // 로그아웃 상태 → 로그인 화면
+  if (session === null) return <LoginScreen onSignedIn={() => {}} />
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: T.bg, color: T.gold, fontFamily: 'Cormorant Garamond, serif', fontSize: '1.4rem', letterSpacing: '0.1em' }}>

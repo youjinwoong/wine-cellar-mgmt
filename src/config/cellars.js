@@ -77,37 +77,13 @@ export async function compressImage(file, maxW = 320, quality = 0.75) {
 }
 
 // ── Anthropic API ────────────────────────────────────────────────
-// 웹 검색 사용 시 pause_turn이 오면 대화를 이어서 자동 재호출 (최대 4회)
+// API 키는 Supabase Edge Function(anthropic-proxy)에만 존재한다.
+// 브라우저에는 키를 두지 않고, 로그인 세션 토큰으로 프록시를 호출한다.
 // maxTokens 기본값 2000: 800 이하는 JSON 잘림으로 조용한 실패 발생 (2026-06 확인)
+import { callProxy } from '../lib/supabase.js'
+
 export async function callAI(messages, maxTokens = 2000, tools = null) {
-  const apiKey = localStorage.getItem('cave_anthropic_key')
-  if (!apiKey) throw new Error('API 키 없음')
-  let msgs = messages
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const body = { model: 'claude-sonnet-4-6', max_tokens: maxTokens, messages: msgs }
-    if (tools) body.tools = tools
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.error?.message || `HTTP ${res.status}`)
-    }
-    const data = await res.json()
-    if (data.stop_reason === 'pause_turn') {
-      msgs = [...msgs, { role: 'assistant', content: data.content }]
-      continue
-    }
-    return data
-  }
-  throw new Error('웹 검색이 완료되지 않음 (pause_turn 반복)')
+  return callProxy(messages, maxTokens, tools)
 }
 
 // ── 공유 URL ─────────────────────────────────────────────────────

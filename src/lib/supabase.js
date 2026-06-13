@@ -4,6 +4,69 @@ export const SUPABASE_URL = 'https://nmjawxbbwlerugfyypft.supabase.co'
 export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tamF3eGJid2xlcnVnZnl5cGZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NjgwNDQsImV4cCI6MjA5NTU0NDA0NH0.TIIjA4J2a2Fuf0HyEXeYobWHPpzYerItNoO7OtR-MaU'
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
+// ── Auth (로그인/세션) ───────────────────────────────────────────
+export async function signIn(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) throw error
+  return data
+}
+
+export async function signOut() {
+  await supabase.auth.signOut()
+}
+
+export async function getSession() {
+  const { data } = await supabase.auth.getSession()
+  return data.session
+}
+
+export function onAuthChange(cb) {
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => cb(session))
+  return () => data.subscription.unsubscribe()
+}
+
+// ── Anthropic 프록시 호출 (Edge Function) ────────────────────────
+// API 키는 서버(Edge Function)에만 존재. 로그인된 사용자만 호출 가능.
+// 웹 검색 사용 시 pause_turn이 오면 대화를 이어서 자동 재호출 (최대 4회)
+const PROXY_URL = `${SUPABASE_URL}/functions/v1/anthropic-proxy`
+
+export async function callProxy(messages, maxTokens = 2000, tools = null) {
+  const session = await getSession()
+  if (!session) throw new Error('로그인이 필요합니다')
+  let msgs = messages
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const body = { model: 'claude-sonnet-4-6', max_tokens: maxTokens, messages: msgs }
+    if (tools) body.tools = tools
+    const res = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error?.message || `HTTP ${res.status}`)
+    }
+    const data = await res.json()
+    if (data.stop_reason === 'pause_turn') {
+      msgs = [...msgs, { role: 'assistant', content: data.content }]
+      continue
+    }
+    return data
+  }
+  throw new Error('웹 검색이 완료되지 않음 (pause_turn 반복)')
+}
+
+// ── 공유 와인 조회 (RPC — 토큰 아는 사람만 1개 조회) ──────────────
+export async function loadSharedWine(token) {
+  const { data, error } = await supabase.rpc('get_shared_wine', { p_token: token })
+  if (error) return null
+  if (!data || (Array.isArray(data) && data.length === 0)) return null
+  return dbToWine(Array.isArray(data) ? data[0] : data)
+}
+
 // ── wines ────────────────────────────────────────────────────────
 export async function loadWines() {
   const { data, error } = await supabase.from('wines').select('*').order('created_at', { ascending: true })

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CELLARS, getSlots, cellarById, T, uid, krw, kdate, callAI, compressImage, getDrinkingStatus, getShareUrl, copyToClipboard } from '../../config/cellars.js'
+import { callProxy, signOut } from '../../lib/supabase.js'
 import { Btn, lbl, StarRating, ImagePicker } from '../ui.jsx'
 
 // ── Detail Modal ────────────────────────────────────────────────
@@ -17,21 +18,7 @@ export function DetailModal({ wine, onClose, onDrink, onRemove, onUpdate, goSlot
     setAiLoad(true)
     try {
       const q = form.vintage ? `${form.name} ${form.vintage}` : form.name
-      const apiKey = localStorage.getItem('cave_anthropic_key')?.trim()
-      if (!apiKey) { alert('⚙️ 설정에서 Claude API 키를 먼저 입력해주세요!'); setAiLoad(false); return }
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          messages: [{ role: 'user', content:
+      const data = await callProxy([{ role: 'user', content:
             `와인 "${q}"의 정보를 웹에서 검색하여 JSON만 반환 (마크다운 없이):
 {"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종","description":"한국어 2문장","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
 
@@ -41,10 +28,8 @@ export function DetailModal({ wine, onClose, onDrink, onRemove, onUpdate, goSlot
 - vivino.com USD → 현재 환율 KRW 환산
 세 가격 중 가장 높은 KRW → wineSearcherPrice
 vivino USD 원본 → vivinoPrice
-숫자만, 모르면 null` }]
-        })
-      })
-      const data = await res.json()
+숫자만, 모르면 null` }],
+        2000, [{ type: 'web_search_20250305', name: 'web_search' }])
       const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '{}'
       const cleaned = text.replace(/```json|```/g, '').trim()
       const match = cleaned.match(/\{[\s\S]*\}/)
@@ -234,9 +219,12 @@ export function DrinkModal({ wine, onConfirm, onClose }) {
 
 // ── Settings Modal ──────────────────────────────────────────────
 export function SettingsModal({ onClose }) {
-  const [key, setKey] = useState(localStorage.getItem('cave_anthropic_key') || '')
-  const [saved, setSaved] = useState(false)
-  function save() { localStorage.setItem('cave_anthropic_key', key.trim()); setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  const [loggingOut, setLoggingOut] = useState(false)
+  async function handleLogout() {
+    setLoggingOut(true)
+    await signOut()
+    // onAuthChange 리스너가 로그인 화면으로 전환
+  }
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -246,21 +234,13 @@ export function SettingsModal({ onClose }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: T.muted, fontSize: '1.2rem' }}>✕</button>
         </div>
         <div style={{ background: T.surface, borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: '0.8rem', color: T.text, lineHeight: 1.6 }}>
-          <strong style={{ color: T.gold }}>Claude API 키</strong>가 있으면:<br />
-          • 와인 정보 자동 검색 (생산자, 지역, 가격)<br />
-          • 사진으로 와인 일괄 입력<br />
-          <span style={{ color: T.muted, fontSize: '0.75rem' }}>키는 이 기기의 localStorage에만 저장됩니다.</span>
+          <strong style={{ color: T.gold }}>AI 기능</strong> (와인 정보 검색, 사진 일괄 입력)은<br />
+          서버를 통해 안전하게 처리됩니다.<br />
+          <span style={{ color: T.muted, fontSize: '0.75rem' }}>API 키는 더 이상 기기에 저장되지 않습니다.</span>
         </div>
-        <div style={{ marginBottom: 16 }}>
-          <label style={lbl}>Anthropic API Key</label>
-          <input value={key} onChange={e => setKey(e.target.value)} type="password" placeholder="sk-ant-api03-..." />
-        </div>
-        <div style={{ marginBottom: 8, fontSize: '0.75rem', color: T.muted }}>
-          키 발급: <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={{ color: T.gold }}>console.anthropic.com</a>
-        </div>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <Btn variant="ghost" onClick={onClose}>닫기</Btn>
-          <Btn variant="gold" onClick={save}>{saved ? '✓ 저장됨' : '저장'}</Btn>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center' }}>
+          <Btn variant="ghost" onClick={handleLogout} disabled={loggingOut}>{loggingOut ? '로그아웃 중…' : '🚪 로그아웃'}</Btn>
+          <Btn variant="gold" onClick={onClose}>닫기</Btn>
         </div>
       </div>
     </div>
@@ -339,39 +319,10 @@ async function resizeForVision(file) {
   })
 }
 
-// Anthropic API 직접 호출 (cellars.js callAI 우회 — API 키 문제 방어)
-// 이미지 분석·가격검색 모두 claude-sonnet-4-6으로 통일
-// 웹 검색 사용 시 pause_turn이 오면 대화를 이어서 자동 재호출 (최대 4회)
+// 이미지 분석·가격검색 모두 Edge Function 프록시(callProxy) 경유
+// API 키는 서버에만 존재. 웹 검색 pause_turn 루프는 callProxy가 처리.
 async function callVisionAPI(messages, maxTokens = 2000, tools = null, vision = false) {
-  const key = localStorage.getItem('cave_anthropic_key')?.trim()
-  if (!key) throw new Error('API 키 없음')
-  const model = 'claude-sonnet-4-6'
-  let msgs = messages
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const body = { model, max_tokens: maxTokens, messages: msgs }
-    if (tools) body.tools = tools
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify(body)
-    })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err?.error?.message || `HTTP ${res.status}`)
-    }
-    const data = await res.json()
-    if (data.stop_reason === 'pause_turn') {
-      msgs = [...msgs, { role: 'assistant', content: data.content }]
-      continue
-    }
-    return data
-  }
-  throw new Error('웹 검색이 완료되지 않음 (pause_turn 반복)')
+  return callProxy(messages, maxTokens, tools)
 }
 
 export function BulkImportModal({ onAddMany, onClose }) {
@@ -436,13 +387,6 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
   async function handleFiles(e) {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
-
-    // API 키 선체크
-    const apiKey = localStorage.getItem('cave_anthropic_key')?.trim()
-    if (!apiKey) {
-      alert('⚙️ 설정에서 Claude API 키를 먼저 입력해주세요!\n\n우측 상단 ⚙️ 설정 → Anthropic API Key 입력')
-      return
-    }
 
     const newPhotos = files.map(f => ({ id: uid(), file: f, dataUrl: null, status: 'pending' }))
     setPhotos(p => [...p, ...newPhotos])
