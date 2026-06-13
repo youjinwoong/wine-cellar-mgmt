@@ -5,7 +5,8 @@ import { loadPublicWines } from '../lib/supabase.js'
 
 // ── 공개 갤러리 (읽기 전용) ──────────────────────────────────────
 // URL ?gallery=1 진입. 추가/수정/삭제/AI 없음. 시장가·셀러·칸만 표시, 구매가 숨김.
-export default function SharedGallery() {
+// ?gallery=1&price=0 진입 시 hidePrice=true → 시장가까지 숨긴 버전 (구매가는 원래 안 보임).
+export default function SharedGallery({ hidePrice = false }) {
   const mobile = useIsMobile()
   const [wines, setWines] = useState([])
   const [loading, setLoading] = useState(true)
@@ -29,7 +30,10 @@ export default function SharedGallery() {
     })
 
   const totalBottles = wines.reduce((s, w) => s + (w.qty || 1), 0)
-  const COLS = '48px 1.6fr 72px 56px 140px 130px'
+  // 시장가 컬럼 유무에 따라 그리드 컬럼 구성을 바꾼다 (헤더/행과 반드시 동일하게 유지)
+  const COLS = hidePrice
+    ? '48px 1.8fr 80px 64px 150px'
+    : '48px 1.6fr 72px 56px 140px 130px'
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: T.bg, color: T.gold, fontFamily: 'Cormorant Garamond, serif', fontSize: '1.4rem', letterSpacing: '0.1em' }}>
@@ -64,7 +68,7 @@ export default function SharedGallery() {
           <select value={sort} onChange={e => setSort(e.target.value)} style={{ width: 'auto', fontSize: '0.8rem', padding: '7px 10px' }}>
             <option value="name">이름순</option>
             <option value="vintage">빈티지순</option>
-            <option value="market">시장가순</option>
+            {!hidePrice && <option value="market">시장가순</option>}
           </select>
         </div>
 
@@ -83,7 +87,7 @@ export default function SharedGallery() {
                         <div style={{ fontSize: '0.72rem', color: T.muted, marginTop: 3, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {w.vintage && <span style={{ color: T.gold }}>{w.vintage}</span>}
                           <span>{w.qty || 1}병</span>
-                          {w.wineSearcherPrice > 0 && <span style={{ color: T.gold }}>시장가 {krw(w.wineSearcherPrice)}</span>}
+                          {!hidePrice && w.wineSearcherPrice > 0 && <span style={{ color: T.gold }}>시장가 {krw(w.wineSearcherPrice)}</span>}
                           {ds && <span style={{ color: ds.color }}>{ds.icon} {ds.label}</span>}
                         </div>
                         <div style={{ fontSize: '0.68rem', color: T.muted, marginTop: 2 }}>{c?.name} 셀러 {w.slot}번 칸</div>
@@ -98,7 +102,7 @@ export default function SharedGallery() {
                   <span>이름</span>
                   <span style={{ textAlign: 'center' }}>빈티지</span>
                   <span style={{ textAlign: 'right' }}>수량</span>
-                  <span style={{ textAlign: 'right', color: T.gold }}>시장가(₩)</span>
+                  {!hidePrice && <span style={{ textAlign: 'right', color: T.gold }}>시장가(₩)</span>}
                   <span>셀러 · 위치</span>
                 </div>
                 {sorted.map(w => {
@@ -112,7 +116,7 @@ export default function SharedGallery() {
                       </div>
                       <span style={{ fontSize: '0.875rem', color: T.gold, fontWeight: 500, textAlign: 'center' }}>{w.vintage || '??'}</span>
                       <span style={{ fontSize: '0.875rem', color: T.text, textAlign: 'right' }}>{w.qty || 1}병</span>
-                      <span style={{ fontSize: '0.875rem', color: w.wineSearcherPrice ? T.gold : T.muted, fontWeight: w.wineSearcherPrice ? 600 : 400, textAlign: 'right' }}>{w.wineSearcherPrice ? krw(w.wineSearcherPrice) : '-'}</span>
+                      {!hidePrice && <span style={{ fontSize: '0.875rem', color: w.wineSearcherPrice ? T.gold : T.muted, fontWeight: w.wineSearcherPrice ? 600 : 400, textAlign: 'right' }}>{w.wineSearcherPrice ? krw(w.wineSearcherPrice) : '-'}</span>}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.surface, borderRadius: 8, padding: '5px 10px', border: `1px solid ${T.border}` }}>
                         <div style={{ fontSize: '0.9rem' }}>📍</div>
                         <div>

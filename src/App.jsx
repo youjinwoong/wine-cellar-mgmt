@@ -59,9 +59,12 @@ function LoginScreen({ onSignedIn }) {
 }
 
 export default function App() {
-  // 공개 갤러리 모드 (?gallery=1) — 로그인 없이 읽기 전용 진입
-  const isGallery = new URLSearchParams(window.location.search).get('gallery') === '1'
-  if (isGallery) return <SharedGallery />
+  // 공개 갤러리 모드 — 로그인 없이 읽기 전용 진입
+  //   ?gallery=1            → 시장가 포함 갤러리
+  //   ?gallery=1&price=0    → 시장가까지 숨긴 갤러리 (구매가는 어느 쪽이든 항상 숨김)
+  const _params = new URLSearchParams(window.location.search)
+  const isGallery = _params.get('gallery') === '1'
+  if (isGallery) return <SharedGallery hidePrice={_params.get('price') === '0'} />
 
   const [session, setSession]   = useState(undefined) // undefined=확인중, null=로그아웃, obj=로그인
   const [wines, setWines]       = useState([])
