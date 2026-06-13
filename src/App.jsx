@@ -13,6 +13,7 @@ import { SearchView, ListView, DrinkLogView, StatisticsView } from './components
 import AddWineModal from './components/modals/AddWineModal.jsx'
 import { DetailModal, DrinkModal, SettingsModal, BulkImportModal } from './components/modals/Modals.jsx'
 import { Toast } from './components/ui.jsx'
+import SharedGallery from './components/SharedGallery.jsx'
 import './index.css'
 
 // ── 로그인 화면 ──────────────────────────────────────────────────
@@ -58,6 +59,10 @@ function LoginScreen({ onSignedIn }) {
 }
 
 export default function App() {
+  // 공개 갤러리 모드 (?gallery=1) — 로그인 없이 읽기 전용 진입
+  const isGallery = new URLSearchParams(window.location.search).get('gallery') === '1'
+  if (isGallery) return <SharedGallery />
+
   const [session, setSession]   = useState(undefined) // undefined=확인중, null=로그아웃, obj=로그인
   const [wines, setWines]       = useState([])
   const [drinkLog, setDrinkLog] = useState([])

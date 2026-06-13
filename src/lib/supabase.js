@@ -59,6 +59,14 @@ export async function callProxy(messages, maxTokens = 2000, tools = null) {
   throw new Error('웹 검색이 완료되지 않음 (pause_turn 반복)')
 }
 
+// ── 공개 갤러리 (읽기 전용 — 로그인 불필요) ───────────────────────
+// get_public_wines RPC: 구매가 제외, 시장가/셀러/칸 등 열람용 컬럼만 반환
+export async function loadPublicWines() {
+  const { data, error } = await supabase.rpc('get_public_wines')
+  if (error) throw error
+  return (data || []).map(dbToWine)
+}
+
 // ── 공유 와인 조회 (RPC — 토큰 아는 사람만 1개 조회) ──────────────
 export async function loadSharedWine(token) {
   const { data, error } = await supabase.rpc('get_shared_wine', { p_token: token })
