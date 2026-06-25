@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { CELLARS, cellarById, T, krw, getDrinkingStatus } from '../config/cellars.js'
+import { CELLARS, cellarById, T, krw, getDrinkingStatus, bottleBadge } from '../config/cellars.js'
 import { useIsMobile } from './ui.jsx'
 import { loadPublicWines } from '../lib/supabase.js'
 
@@ -85,7 +85,7 @@ export default function SharedGallery({ hidePrice = false }) {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '0.875rem', fontWeight: 500, color: T.cream, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
                         <div style={{ fontSize: '0.72rem', color: T.muted, marginTop: 3, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          {w.vintage && <span style={{ color: T.gold }}>{w.vintage}</span>}
+                          {w.vintage && <span style={{ color: T.gold }}>{w.vintage}</span>}{bottleBadge(w.bottleSize) && <span style={{ color: T.wineLight, fontWeight: 600 }}>{bottleBadge(w.bottleSize)}</span>}
                           <span>{w.qty || 1}병</span>
                           {!hidePrice && w.wineSearcherPrice > 0 && <span style={{ color: T.gold }}>시장가 {krw(w.wineSearcherPrice)}</span>}
                           {ds && <span style={{ color: ds.color }}>{ds.icon} {ds.label}</span>}
@@ -111,7 +111,10 @@ export default function SharedGallery({ hidePrice = false }) {
                     <div key={w.id} style={{ display: 'grid', gridTemplateColumns: COLS, gap: 10, alignItems: 'center', padding: '10px 14px', borderRadius: 8, marginBottom: 2 }}>
                       {w.imageUrl ? <img src={w.imageUrl} alt="" style={{ width: 36, height: 50, objectFit: 'cover', borderRadius: 4 }} onError={e => e.target.style.display = 'none'} /> : <div style={{ width: 36, height: 50, background: T.surface, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.9rem' }}>🍷</div>}
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: '0.875rem', fontWeight: 500, color: T.cream, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.875rem', fontWeight: 500, color: T.cream, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
+                          {bottleBadge(w.bottleSize) && <span style={{ fontSize: '0.7rem', color: T.wineLight, fontWeight: 600, flexShrink: 0 }}>{bottleBadge(w.bottleSize)}</span>}
+                        </div>
                         {w.producer && <div style={{ fontSize: '0.7rem', color: T.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.producer}</div>}
                       </div>
                       <span style={{ fontSize: '0.875rem', color: T.gold, fontWeight: 500, textAlign: 'center' }}>{w.vintage || '??'}</span>

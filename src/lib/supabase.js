@@ -142,6 +142,7 @@ function wineToDb(w) {
     drinking_from: w.drinkingFrom || null,
     drinking_to: w.drinkingTo || null,
     wine_type: w.wineType || 'red',
+    bottle_size: w.bottleSize || 750,
     share_token: w.shareToken || null,
   }
 }
@@ -156,6 +157,7 @@ function dbToWine(r) {
     vivinoRating: r.vivino_rating, wineSearcherPrice: r.wine_searcher_price,
     drinkingFrom: r.drinking_from, drinkingTo: r.drinking_to,
     wineType: r.wine_type, shareToken: r.share_token,
+    bottleSize: r.bottle_size || 750,
   }
 }
 

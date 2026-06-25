@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CELLARS, getSlots, cellarById, T, uid, krw, kdate, callAI, compressImage, getDrinkingStatus, getShareUrl, copyToClipboard } from '../../config/cellars.js'
+import { CELLARS, getSlots, cellarById, T, uid, krw, kdate, callAI, compressImage, getDrinkingStatus, getShareUrl, copyToClipboard, BOTTLE_SIZES, bottleLabel, bottleBadge } from '../../config/cellars.js'
 import { callProxy, signOut } from '../../lib/supabase.js'
 import { Btn, lbl, StarRating, ImagePicker } from '../ui.jsx'
 
@@ -95,6 +95,14 @@ vivino USD 원본 → vivinoPrice
         <div style={G}>
           <div><label style={lbl}>빈티지</label><input value={form.vintage || ''} onChange={e => setF('vintage', e.target.value)} type="number" /></div>
           <div><label style={lbl}>수량</label><input value={form.qty || 1} onChange={e => setF('qty', e.target.value)} type="number" min="1" /></div>
+        </div>
+        <div style={G}>
+          <div><label style={lbl}>용량</label>
+            <select value={form.bottleSize || 750} onChange={e => setF('bottleSize', parseInt(e.target.value))}>
+              {BOTTLE_SIZES.map(b => <option key={b.ml} value={b.ml}>{b.label}</option>)}
+            </select>
+          </div>
+          <div></div>
         </div>
         <div style={G}>
           <div><label style={lbl}>구매일</label><input value={form.purchaseDate || ''} onChange={e => setF('purchaseDate', e.target.value)} type="date" /></div>
@@ -215,6 +223,7 @@ vivino USD 원본 → vivinoPrice
             <button onClick={onClose} style={{ float: 'right', background: 'none', border: 'none', color: T.muted, fontSize: '1.1rem' }}>✕</button>
             <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '1.25rem', color: T.cream, lineHeight: 1.3, marginBottom: 6 }}>{wine.name}</h2>
             {wine.vintage && <div style={{ color: T.gold, fontWeight: 600, fontSize: '1rem', marginBottom: 6 }}>{wine.vintage}</div>}
+            {bottleBadge(wine.bottleSize) && <div style={{ display: 'inline-block', background: `${T.wine}33`, color: T.wineLight, border: `1px solid ${T.wine}`, borderRadius: 6, padding: '2px 9px', fontSize: '0.72rem', fontWeight: 600, marginBottom: 6 }}>{bottleBadge(wine.bottleSize)}</div>}
             {wine.producer && <div style={{ fontSize: '0.78rem', color: T.muted }}>{wine.producer}</div>}
             {wine.region && <div style={{ fontSize: '0.78rem', color: T.muted }}>{wine.country ? `${wine.region}, ${wine.country}` : wine.region}</div>}
             {wine.grape && <div style={{ fontSize: '0.76rem', color: T.muted, marginTop: 2 }}>🍇 {wine.grape}</div>}
@@ -520,7 +529,7 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
         const withMeta = found.map(w => ({
           _id: uid(), name: w.name || '', vintage: w.vintage || null,
           qty: w.qty || 1, cellarId, slot, price: '', purchaseDate: '',
-          imageUrl: thumb, notes: '', _enriched: false
+          imageUrl: thumb, notes: '', bottleSize: 750, _enriched: false
         }))
         newlyFound = [...newlyFound, ...withMeta]
         setWineList(p => [...p, ...withMeta])
@@ -535,10 +544,10 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
     }
     e.target.value = ''
 
-    // 모든 사진 처리 완료 → 자동으로 step3 이동 + 가격 정보 자동 검색
+    // 사진 인식 완료 → 검토 화면(③)으로만 이동.
+    // 가격 검색은 자동 시작하지 않고, 사용자가 용량·수량을 확인/수정한 뒤 직접 시작한다.
     if (newlyFound.length > 0) {
       setStep(3)
-      await enrichWines(newlyFound)
     }
   }
 
@@ -629,9 +638,14 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
                 <span style={{ color: T.gold }}> {cellarById(cellarId)?.name} · {slot}번 칸</span>
               </div>
               <button onClick={runEnrich} disabled={enriching} style={{ background: enriching ? T.muted : T.surface, color: enriching ? T.bg : T.gold, border: `1px solid ${T.gold}44`, cursor: enriching ? 'not-allowed' : 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: '0.78rem' }}>
-                {enriching ? `🔍 가격 검색 중... ${enrichProgress}%` : '🔄 가격·정보 다시 검색'}
+                {enriching ? `🔍 가격 검색 중... ${enrichProgress}%` : (wineList.some(w => w._enriched) ? '🔄 가격·정보 다시 검색' : '🔍 가격·정보 검색')}
               </button>
             </div>
+            {!enriching && !wineList.some(w => w._enriched) && (
+              <div style={{ fontSize: '0.74rem', color: T.muted, marginBottom: 12, lineHeight: 1.5 }}>
+                용량·수량을 확인한 뒤 <span style={{ color: T.gold }}>🔍 가격·정보 검색</span>을 눌러 시작하세요.
+              </div>
+            )}
             <div style={{ maxHeight: 380, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
               {wineList.map(w => (
                 <div key={w._id} style={{ background: T.surface, border: `1px solid ${w._enriched ? T.gold + '44' : T.border}`, borderRadius: 10, padding: '12px 14px' }}>
@@ -643,6 +657,11 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
                         <input value={w.vintage || ''} onChange={e => setField(w._id, 'vintage', e.target.value ? parseInt(e.target.value) : null)} type="number" placeholder="빈티지" style={{ fontSize: '0.8rem' }} />
                         <input value={w.qty} onChange={e => setField(w._id, 'qty', parseInt(e.target.value) || 1)} type="number" min="1" style={{ fontSize: '0.8rem' }} placeholder="수량" />
                         <input value={w.price || ''} onChange={e => setField(w._id, 'price', e.target.value)} type="number" placeholder="구매가 ₩" style={{ fontSize: '0.8rem' }} />
+                      </div>
+                      <div style={{ marginTop: 6 }}>
+                        <select value={w.bottleSize || 750} onChange={e => setField(w._id, 'bottleSize', parseInt(e.target.value))} style={{ fontSize: '0.8rem' }}>
+                          {BOTTLE_SIZES.map(b => <option key={b.ml} value={b.ml}>{b.label}</option>)}
+                        </select>
                       </div>
                       {w._enriched && <div style={{ marginTop: 5, fontSize: '0.72rem', color: T.muted, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                         {w.producer && <span>{w.producer}</span>}
