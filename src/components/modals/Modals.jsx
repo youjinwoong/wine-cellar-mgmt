@@ -425,6 +425,38 @@ async function callVisionAPI(messages, maxTokens = 2000, tools = null, vision = 
   return callProxy(messages, maxTokens, tools)
 }
 
+// 정규화 박스(0~1)로 dataUrl 이미지를 잘라 와인별 썸네일 생성.
+// box가 없거나 비정상이면 전체 이미지로 폴백(빈 문자열 반환 시 호출부에서 전체 썸네일 사용).
+async function cropToThumb(dataUrl, box, maxW = 320) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const W = img.width, H = img.height
+      const valid = box && ['x','y','w','h'].every(k => typeof box[k] === 'number')
+      let x = 0, y = 0, w = W, h = H
+      if (valid) {
+        x = box.x * W; y = box.y * H; w = box.w * W; h = box.h * H
+        // 라벨만 너무 빡빡하게 잘리지 않도록 약간의 여백
+        const padX = w * 0.08, padY = h * 0.08
+        x -= padX; y -= padY; w += padX * 2; h += padY * 2
+        // 이미지 경계 안으로 보정
+        x = Math.max(0, Math.min(x, W)); y = Math.max(0, Math.min(y, H))
+        w = Math.max(1, Math.min(w, W - x)); h = Math.max(1, Math.min(h, H - y))
+        // 영역이 비정상적으로 작으면 전체로 폴백
+        if (w < W * 0.04 || h < H * 0.04) { x = 0; y = 0; w = W; h = H }
+      }
+      const scale = Math.min(1, maxW / w)
+      const canvas = document.createElement('canvas')
+      canvas.width  = Math.round(w * scale)
+      canvas.height = Math.round(h * scale)
+      canvas.getContext('2d').drawImage(img, x, y, w, h, 0, 0, canvas.width, canvas.height)
+      resolve(canvas.toDataURL('image/jpeg', 0.8))
+    }
+    img.onerror = () => resolve('')
+    img.src = dataUrl
+  })
+}
+
 export function BulkImportModal({ onAddMany, onClose }) {
   const [step, setStep] = useState(1)
   const [cellarId, setCellarId] = useState('vindis1')
@@ -511,9 +543,10 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
 - 와인 이름은 라벨에 표기된 공식 명칭으로 (예: "Château Lafite Rothschild", "Opus One")
 - 같은 와인이라도 빈티지가 다르면 각각 별도 항목으로 기재하세요
 - 라벨을 전혀 읽을 수 없는 병만 "미확인"으로 처리하세요
+- 각 와인마다 사진에서 그 병이 차지하는 영역을 box로 표시하세요. box는 병 전체(병목~바닥)가 들어가도록 하고, 사진 왼쪽 위를 (0,0), 오른쪽 아래를 (1,1)로 한 비율 좌표입니다. x,y는 영역의 좌상단, w,h는 너비·높이(모두 0~1). 같은 와인이 여러 병이면 대표 한 병의 box. 위치를 알 수 없으면 box는 null.
 
 반드시 아래 JSON 배열 형식만 반환하세요 (마크다운, 설명 텍스트 절대 없이):
-[{"name":"와인 전체 이름","vintage":연도숫자또는null,"qty":병수정수}]` }
+[{"name":"와인 전체 이름","vintage":연도숫자또는null,"qty":병수정수,"box":{"x":0.0,"y":0.0,"w":1.0,"h":1.0}}]` }
         ]}], 3000, null, true)
 
         const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '[]'
@@ -526,11 +559,24 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
         const found = JSON.parse(match[0])
         if (!Array.isArray(found) || found.length === 0) throw new Error('빈 배열 반환')
 
-        const withMeta = found.map(w => ({
-          _id: uid(), name: w.name || '', vintage: w.vintage || null,
-          qty: w.qty || 1, cellarId, slot, price: '', purchaseDate: '',
-          imageUrl: thumb, notes: '', bottleSize: 750, _enriched: false
-        }))
+        // 와인별로 라벨 위치(box)에 맞춰 사진을 잘라 개별 썸네일 생성.
+        // box가 1개뿐이거나 없으면 전체 사진(thumb)으로 폴백.
+        const singleBox = found.length === 1
+        const withMeta = []
+        for (const w of found) {
+          let img = thumb
+          if (!singleBox && w.box) {
+            try {
+              const cropped = await cropToThumb(dataUrl, w.box)
+              if (cropped) img = cropped
+            } catch { /* 크롭 실패 시 전체 사진 사용 */ }
+          }
+          withMeta.push({
+            _id: uid(), name: w.name || '', vintage: w.vintage || null,
+            qty: w.qty || 1, cellarId, slot, price: '', purchaseDate: '',
+            imageUrl: img, notes: '', bottleSize: 750, _enriched: false
+          })
+        }
         newlyFound = [...newlyFound, ...withMeta]
         setWineList(p => [...p, ...withMeta])
         setPhotos(p => p.map(x => x.id === ph.id ? { ...x, status: 'done', count: found.length } : x))
@@ -650,7 +696,15 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
               {wineList.map(w => (
                 <div key={w._id} style={{ background: T.surface, border: `1px solid ${w._enriched ? T.gold + '44' : T.border}`, borderRadius: 10, padding: '12px 14px' }}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    {w.imageUrl ? <img src={w.imageUrl} alt="" style={{ width: 36, height: 52, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} /> : <div style={{ width: 36, height: 52, background: T.card, borderRadius: 4, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', border: `1px solid ${T.border}` }}>🍷</div>}
+                    <label style={{ cursor: 'pointer', flexShrink: 0, position: 'relative', display: 'block' }} title="눌러서 사진 교체">
+                      {w.imageUrl ? <img src={w.imageUrl} alt="" style={{ width: 36, height: 52, objectFit: 'cover', borderRadius: 4, display: 'block' }} onError={e => e.target.style.display = 'none'} /> : <div style={{ width: 36, height: 52, background: T.card, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', border: `1px solid ${T.border}` }}>🍷</div>}
+                      <span style={{ position: 'absolute', bottom: -2, right: -2, fontSize: '0.6rem', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 4, padding: '0 2px', color: T.muted }}>✎</span>
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async e => {
+                        const f = e.target.files?.[0]; if (!f) return
+                        try { const t = await compressImage(f, 320); setField(w._id, 'imageUrl', t) } catch { /* 무시 */ }
+                        e.target.value = ''
+                      }} />
+                    </label>
                     <div style={{ flex: 1 }}>
                       <input value={w.name} onChange={e => setField(w._id, 'name', e.target.value)} style={{ marginBottom: 6, fontWeight: 500, fontSize: '0.875rem' }} placeholder="와인 이름" />
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
