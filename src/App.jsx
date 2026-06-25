@@ -150,17 +150,43 @@ export default function App() {
     catch { showToast('⚠ 삭제 실패', 'error') }
   }
 
-  // 위치 이동 — moveQty가 전체보다 적으면 분할(원본 차감 + 새 위치에 새 레코드)
+  // 위치 이동 — moveQty가 전체보다 적으면 분할.
+  // 목적지 칸에 같은 와인(이름+빈티지 일치)이 이미 있으면 새 레코드 대신 병 수를 합친다.
   async function moveWine(wine, toCellarId, toSlot, moveQty) {
     const total = wine.qty || 1
     const qty = Math.max(1, Math.min(parseInt(moveQty) || total, total))
+
+    // 목적지에 동일 와인이 이미 있는지 찾기 (자기 자신 제외)
+    const isSame = (a, b) =>
+      (a.name || '').trim() === (b.name || '').trim() &&
+      (a.vintage || null) === (b.vintage || null)
+    const target = wines.find(w =>
+      w.id !== wine.id &&
+      w.cellarId === toCellarId &&
+      String(w.slot) === String(toSlot) &&
+      isSame(w, wine)
+    )
+
     if (qty >= total) {
-      // 전체 이동 — 위치만 변경
-      await updateWine(wine.id, { cellarId: toCellarId, slot: toSlot })
+      // 전체 이동
+      if (target) {
+        // 목적지 레코드에 합치고 원본 삭제
+        await updateWine(target.id, { qty: (target.qty || 1) + total })
+        await removeWine(wine.id)
+      } else {
+        // 위치만 변경
+        await updateWine(wine.id, { cellarId: toCellarId, slot: toSlot })
+      }
     } else {
-      // 분할 이동 — 원본 병 수 차감 후 새 위치에 별도 레코드 생성
+      // 분할 이동 — 원본 병 수 차감
       await updateWine(wine.id, { qty: total - qty })
-      await addWine({ ...wine, id: uid(), qty, cellarId: toCellarId, slot: toSlot, shareToken: null })
+      if (target) {
+        // 목적지 레코드에 합치기
+        await updateWine(target.id, { qty: (target.qty || 1) + qty })
+      } else {
+        // 새 위치에 별도 레코드 생성
+        await addWine({ ...wine, id: uid(), qty, cellarId: toCellarId, slot: toSlot, shareToken: null })
+      }
     }
     showToast(`🚚 ${qty}병 이동 완료`, 'success')
   }
