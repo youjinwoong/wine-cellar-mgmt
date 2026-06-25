@@ -6,12 +6,29 @@ import { Btn, lbl, StarRating, ImagePicker } from '../ui.jsx'
 // ── Detail Modal ────────────────────────────────────────────────
 export function DetailModal({ wine, onClose, onDrink, onRemove, onUpdate, goSlot }) {
   const [editing, setEditing] = useState(false)
+  const [moving, setMoving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [form, setForm] = useState({ ...wine })
   const [aiLoad, setAiLoad] = useState(false)
+  // 위치 이동 전용 상태 (전체 수정 폼과 분리)
+  const [moveCellar, setMoveCellar] = useState(wine.cellarId)
+  const [moveSlot, setMoveSlot] = useState(wine.slot)
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const c = cellarById(wine.cellarId)
   const curCellar = cellarById(form.cellarId)
+  const moveCellarObj = cellarById(moveCellar)
+
+  function startMove() {
+    // 항상 현재 위치에서 시작
+    setMoveCellar(wine.cellarId)
+    setMoveSlot(wine.slot)
+    setMoving(true)
+  }
+
+  function saveMove() {
+    onUpdate({ ...wine, cellarId: moveCellar, slot: moveSlot })
+    setMoving(false)
+  }
 
   async function runAI() {
     if (!form.name?.trim()) return
@@ -113,6 +130,53 @@ vivino USD 원본 → vivinoPrice
     </div>
   )
 
+  if (moving) {
+    const unchanged = moveCellar === wine.cellarId && moveSlot === wine.slot
+    return (
+      <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className="modal-box" style={{ maxWidth: 440 }}>
+          <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '1.3rem', color: T.cream, marginBottom: 6 }}>🚚 위치 이동</h2>
+          <div style={{ fontSize: '0.85rem', color: T.muted, marginBottom: 20 }}>{wine.name}{wine.vintage ? ` · ${wine.vintage}` : ''}</div>
+
+          {/* 현재 → 이동 후 위치 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
+            <div style={{ flex: 1, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ fontSize: '0.64rem', color: T.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>현재</div>
+              <div style={{ fontSize: '0.85rem', color: T.cream }}>{c?.name}</div>
+              <div style={{ fontSize: '0.75rem', color: T.muted }}>{wine.slot}번 칸</div>
+            </div>
+            <div style={{ color: T.gold, fontSize: '1.2rem', flexShrink: 0 }}>→</div>
+            <div style={{ flex: 1, background: T.surface, border: `1px solid ${unchanged ? T.border : T.gold}66`, borderRadius: 8, padding: '10px 12px' }}>
+              <div style={{ fontSize: '0.64rem', color: unchanged ? T.muted : T.gold, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>이동 후</div>
+              <div style={{ fontSize: '0.85rem', color: T.cream }}>{moveCellarObj?.name}</div>
+              <div style={{ fontSize: '0.75rem', color: T.muted }}>{moveSlot}번 칸</div>
+            </div>
+          </div>
+
+          <div style={G}>
+            <div>
+              <label style={lbl}>셀러</label>
+              <select value={moveCellar} onChange={e => { setMoveCellar(e.target.value); setMoveSlot('1') }}>
+                {CELLARS.map(cl => <option key={cl.id} value={cl.id}>{cl.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>칸 번호</label>
+              <select value={moveSlot} onChange={e => setMoveSlot(e.target.value)}>
+                {getSlots(moveCellarObj).map(s => <option key={s} value={s}>{s}번 칸</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+            <Btn variant="ghost" onClick={() => setMoving(false)}>취소</Btn>
+            <Btn variant="gold" onClick={saveMove} disabled={unchanged}>이동</Btn>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box" style={{ maxWidth: 480 }}>
@@ -161,6 +225,7 @@ vivino USD 원본 → vivinoPrice
         <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <Btn variant="ghost" size="sm" onClick={() => { goSlot(wine.cellarId, wine.slot); onClose() }}>📍 위치</Btn>
+            <Btn variant="ghost" size="sm" onClick={startMove}>🚚 이동</Btn>
             <Btn variant="ghost" size="sm" onClick={() => setEditing(true)}>✏️ 수정</Btn>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
