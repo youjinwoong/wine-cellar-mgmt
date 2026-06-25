@@ -417,6 +417,7 @@ vivino USD 원본 → vivinoPrice
 // ── Drink Log View ───────────────────────────────────────────────
 export function DrinkLogView({ drinkLog, onDelete }) {
   const [filter, setFilter] = useState('')
+  const [confirmId, setConfirmId] = useState(null)
   const sorted = [...drinkLog].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt))
   const filtered = filter ? sorted.filter(r => (r.wineName || '').toLowerCase().includes(filter.toLowerCase()) || (r.companions || '').toLowerCase().includes(filter.toLowerCase())) : sorted
 
@@ -435,10 +436,6 @@ export function DrinkLogView({ drinkLog, onDelete }) {
         : <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map(r => (
               <div key={r.id} style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, position: 'relative' }}>
-                <button onClick={() => onDelete(r.id)} style={{ position: 'absolute', top: 14, right: 14, background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: '0.85rem', padding: '4px 8px', borderRadius: 6 }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#c0392b'}
-                  onMouseLeave={e => e.currentTarget.style.color = T.muted}
-                >✕</button>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
                   {r.imageUrl ? <img src={r.imageUrl} alt="" style={{ width: 44, height: 62, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} onError={e => e.target.style.display = 'none'} /> : <div style={{ width: 44, height: 62, background: T.surface, borderRadius: 6, border: `1px solid ${T.border}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>🍷</div>}
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -465,6 +462,19 @@ export function DrinkLogView({ drinkLog, onDelete }) {
                     </div>
                     {r.review && <div style={{ background: T.surface, borderRadius: 8, padding: '10px 12px', borderLeft: `2px solid ${T.gold}` }}><p style={{ fontSize: '0.85rem', color: T.text, lineHeight: 1.6, fontStyle: 'italic' }}>{r.review}</p></div>}
                   </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+                  {confirmId === r.id
+                    ? <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: '#c0392b22', border: '1px solid #c0392b', borderRadius: 8, padding: '4px 10px' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#e07070' }}>이 기록을 삭제할까요?</span>
+                        <button onClick={() => { onDelete(r.id); setConfirmId(null) }} style={{ background: '#c0392b', color: 'white', border: 'none', borderRadius: 6, padding: '3px 10px', fontSize: '0.78rem', cursor: 'pointer' }}>확인</button>
+                        <button onClick={() => setConfirmId(null)} style={{ background: 'transparent', border: `1px solid ${T.border}`, color: T.muted, borderRadius: 6, padding: '3px 10px', fontSize: '0.78rem', cursor: 'pointer' }}>취소</button>
+                      </div>
+                    : <button onClick={() => setConfirmId(r.id)} style={{ background: 'transparent', border: `1px solid ${T.border}`, color: T.muted, borderRadius: 8, padding: '5px 12px', fontSize: '0.78rem', cursor: 'pointer' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#e07070'; e.currentTarget.style.borderColor = '#c0392b' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = T.muted; e.currentTarget.style.borderColor = T.border }}
+                      >🗑 삭제</button>
+                  }
                 </div>
               </div>
             ))}
