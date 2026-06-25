@@ -518,6 +518,14 @@ export function StatisticsView({ wines, drinkLog }) {
   const totalMarket   = wines.reduce((s,w) => s + (w.wineSearcherPrice||0)*(w.qty||1), 0)
   const totalBottles  = wines.reduce((s,w) => s + (w.qty||1), 0)
 
+  // 평가 차익·수익률은 구매가·시장가가 모두 있는 와인만 비교 (한쪽만 있으면 왜곡되므로 제외)
+  const valued         = wines.filter(w => (w.price||0) > 0 && (w.wineSearcherPrice||0) > 0)
+  const valuedBottles  = valued.reduce((s,w) => s + (w.qty||1), 0)
+  const valuedPurchase = valued.reduce((s,w) => s + w.price*(w.qty||1), 0)
+  const valuedMarket   = valued.reduce((s,w) => s + w.wineSearcherPrice*(w.qty||1), 0)
+  const valuedGain     = valuedMarket - valuedPurchase
+  const profitRate     = valuedPurchase > 0 ? (valuedGain / valuedPurchase * 100) : 0
+
   const Card = ({ title, children }) => (
     <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius:12, padding:20, marginBottom:16 }}>
       <div style={{ fontSize:'0.75rem', color:T.gold, textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:14, fontWeight:600 }}>{title}</div>
@@ -537,14 +545,18 @@ export function StatisticsView({ wines, drinkLog }) {
             ['와인 기록 수', `${wines.length}종`],
             ['구매가 합계', krw(totalPurchase)],
             ['시장가 합계', krw(totalMarket)],
-            ['평가 차익', totalMarket>totalPurchase ? '+'+krw(totalMarket-totalPurchase) : krw(totalMarket-totalPurchase)],
-            ['수익률', `${krw(Math.round(totalMarket/totalBottles||0))}`],
+            ['평가 차익', valuedGain>=0 ? '+'+krw(valuedGain) : krw(valuedGain)],
+            ['수익률', `${profitRate>=0?'+':''}${profitRate.toFixed(1)}%`],
           ].map(([k,v]) => (
             <div key={k} style={{ background:T.surface, borderRadius:8, padding:'10px 12px', border:`1px solid ${T.border}` }}>
               <div style={{ fontSize:'0.66rem', color:T.muted, marginBottom:5 }}>{k}</div>
-              <div style={{ fontSize:'0.95rem', fontWeight:600, color: k==='평가 차익'&&totalMarket>totalPurchase?'#4a8a5e':T.cream }}>{v}</div>
+              <div style={{ fontSize:'0.95rem', fontWeight:600, color: (k==='평가 차익'||k==='수익률') ? (valuedGain>=0?'#4a8a5e':'#c0392b') : T.cream }}>{v}</div>
             </div>
           ))}
+        </div>
+        <div style={{ fontSize:'0.68rem', color:T.muted, marginTop:12, lineHeight:1.5 }}>
+          ※ 평가 차익·수익률은 구매가와 시장가가 모두 등록된 {valued.length}종({valuedBottles}병) 기준입니다.
+          {valued.length < wines.length && ' 시장가나 구매가가 비어 있는 와인은 비교에서 제외됩니다.'}
         </div>
       </Card>
 
