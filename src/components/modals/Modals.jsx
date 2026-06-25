@@ -255,7 +255,7 @@ vivino USD 원본 → vivinoPrice
             <Btn variant="ghost" size="sm" onClick={() => setEditing(true)}>✏️ 수정</Btn>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Btn variant="wine" size="sm" onClick={() => { onDrink(wine); onClose() }}>🍷 마심</Btn>
+            <Btn variant="wine" size="sm" onClick={() => onDrink(wine)}>🍷 마심</Btn>
             {confirmDelete
               ? <div style={{ display: 'flex', gap: 6, alignItems: 'center', background: '#c0392b22', border: '1px solid #c0392b', borderRadius: 8, padding: '4px 10px' }}>
                   <span style={{ fontSize: '0.78rem', color: '#e07070' }}>삭제?</span>

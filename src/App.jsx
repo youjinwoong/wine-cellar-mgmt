@@ -289,7 +289,7 @@ export default function App() {
         <SettingsModal onClose={() => setModal(null)} />
       )}
       {modal?.type === 'drink' && (
-        <DrinkModal wine={modal.wine} onConfirm={record => drinkWine(modal.wine, record)} onClose={() => setModal(null)} />
+        <DrinkModal wine={modal.wine} onConfirm={record => { drinkWine(modal.wine, record); setModal(null) }} onClose={() => setModal(null)} />
       )}
       {detailWine && (
         <DetailModal
