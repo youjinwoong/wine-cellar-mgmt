@@ -439,7 +439,7 @@ export function BulkImportModal({ onAddMany, onClose }) {
         const q = w.vintage ? `${w.name} ${w.vintage}` : w.name
         const data = await callVisionAPI([{ role: 'user', content:
           `와인 "${q}"의 정보를 웹에서 검색하여 아래 JSON 형식으로만 반환하세요 (마크다운 없이, 설명 없이):
-{"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종","description":"이 와인을 한국어로 2문장 설명","imageUrl":"","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
+{"producer":"생산자명","region":"지역명","country":"국가명","grape":"품종","description":"이 와인을 한국어로 2문장 설명","vivinoPrice":null,"vivinoRating":null,"wineSearcherPrice":null}
 
 가격 수집 방법 (750ml 1병 기준):
 - wine-searcher.com 한국(Korea) KRW 가격 조회
@@ -464,6 +464,8 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
           try { info = JSON.parse(candidates[k]); break } catch { /* 다음 후보 */ }
         }
         const idx = result.findIndex(x => x._id === w._id)
+        // AI가 imageUrl을 비워서 반환해도 사용자가 찍은 사진을 덮어쓰지 않도록 제외
+        if (!info.imageUrl) delete info.imageUrl
         if (idx !== -1) result[idx] = { ...result[idx], ...info, _enriched: true }
         setWineList([...result])
       } catch (err) {
@@ -484,6 +486,9 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
     let newlyFound = []
     for (const ph of newPhotos) {
       const { dataUrl, base64 } = await resizeForVision(ph.file)
+      // 저장용 썸네일 — 사용자가 찍은 사진을 와인 이미지로 그대로 활용
+      let thumb = ''
+      try { thumb = await compressImage(ph.file, 320) } catch { thumb = '' }
       setPhotos(p => p.map(x => x.id === ph.id ? { ...x, dataUrl, status: 'scanning' } : x))
       try {
         const data = await callVisionAPI([{ role: 'user', content: [
@@ -515,7 +520,7 @@ vivinoPrice는 vivino.com USD 원본 가격 그대로 입력하세요.
         const withMeta = found.map(w => ({
           _id: uid(), name: w.name || '', vintage: w.vintage || null,
           qty: w.qty || 1, cellarId, slot, price: '', purchaseDate: '',
-          imageUrl: '', notes: '', _enriched: false
+          imageUrl: thumb, notes: '', _enriched: false
         }))
         newlyFound = [...newlyFound, ...withMeta]
         setWineList(p => [...p, ...withMeta])
