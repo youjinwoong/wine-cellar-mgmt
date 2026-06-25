@@ -150,6 +150,21 @@ export default function App() {
     catch { showToast('⚠ 삭제 실패', 'error') }
   }
 
+  // 위치 이동 — moveQty가 전체보다 적으면 분할(원본 차감 + 새 위치에 새 레코드)
+  async function moveWine(wine, toCellarId, toSlot, moveQty) {
+    const total = wine.qty || 1
+    const qty = Math.max(1, Math.min(parseInt(moveQty) || total, total))
+    if (qty >= total) {
+      // 전체 이동 — 위치만 변경
+      await updateWine(wine.id, { cellarId: toCellarId, slot: toSlot })
+    } else {
+      // 분할 이동 — 원본 병 수 차감 후 새 위치에 별도 레코드 생성
+      await updateWine(wine.id, { qty: total - qty })
+      await addWine({ ...wine, id: uid(), qty, cellarId: toCellarId, slot: toSlot, shareToken: null })
+    }
+    showToast(`🚚 ${qty}병 이동 완료`, 'success')
+  }
+
   async function drinkWine(wine, record) {
     // Decrement qty
     const newQty = (wine.qty || 1) - 1
@@ -257,6 +272,7 @@ export default function App() {
           onDrink={w => { setModal({ type: 'drink', wine: w }) }}
           onRemove={async () => { await removeWine(detailWine.id); setModal(null) }}
           onUpdate={async updates => { await updateWine(detailWine.id, updates) }}
+          onMove={moveWine}
           goSlot={goSlot}
         />
       )}

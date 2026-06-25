@@ -4,7 +4,7 @@ import { callProxy, signOut } from '../../lib/supabase.js'
 import { Btn, lbl, StarRating, ImagePicker } from '../ui.jsx'
 
 // ── Detail Modal ────────────────────────────────────────────────
-export function DetailModal({ wine, onClose, onDrink, onRemove, onUpdate, goSlot }) {
+export function DetailModal({ wine, onClose, onDrink, onRemove, onUpdate, onMove, goSlot }) {
   const [editing, setEditing] = useState(false)
   const [moving, setMoving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -13,20 +13,28 @@ export function DetailModal({ wine, onClose, onDrink, onRemove, onUpdate, goSlot
   // 위치 이동 전용 상태 (전체 수정 폼과 분리)
   const [moveCellar, setMoveCellar] = useState(wine.cellarId)
   const [moveSlot, setMoveSlot] = useState(wine.slot)
+  const [moveQty, setMoveQty] = useState(wine.qty || 1)
   const setF = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const c = cellarById(wine.cellarId)
   const curCellar = cellarById(form.cellarId)
   const moveCellarObj = cellarById(moveCellar)
 
   function startMove() {
-    // 항상 현재 위치에서 시작
+    // 항상 현재 위치·전체 병 수에서 시작
     setMoveCellar(wine.cellarId)
     setMoveSlot(wine.slot)
+    setMoveQty(wine.qty || 1)
     setMoving(true)
   }
 
-  function saveMove() {
-    onUpdate({ ...wine, cellarId: moveCellar, slot: moveSlot })
+  function saveMove(qty) {
+    if (onMove) {
+      // 분할 이동 지원 (일부 병만 새 위치로)
+      onMove(wine, moveCellar, moveSlot, qty)
+    } else {
+      // onMove 미전달 시 폴백: 전체 이동
+      onUpdate({ ...wine, cellarId: moveCellar, slot: moveSlot })
+    }
     setMoving(false)
   }
 
@@ -131,6 +139,9 @@ vivino USD 원본 → vivinoPrice
   )
 
   if (moving) {
+    const total = wine.qty || 1
+    const qty = Math.max(1, Math.min(parseInt(moveQty) || total, total))
+    const remaining = total - qty
     const unchanged = moveCellar === wine.cellarId && moveSlot === wine.slot
     return (
       <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -139,17 +150,17 @@ vivino USD 원본 → vivinoPrice
           <div style={{ fontSize: '0.85rem', color: T.muted, marginBottom: 20 }}>{wine.name}{wine.vintage ? ` · ${wine.vintage}` : ''}</div>
 
           {/* 현재 → 이동 후 위치 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
             <div style={{ flex: 1, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: '10px 12px' }}>
               <div style={{ fontSize: '0.64rem', color: T.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>현재</div>
               <div style={{ fontSize: '0.85rem', color: T.cream }}>{c?.name}</div>
-              <div style={{ fontSize: '0.75rem', color: T.muted }}>{wine.slot}번 칸</div>
+              <div style={{ fontSize: '0.75rem', color: T.muted }}>{wine.slot}번 칸 · {total}병</div>
             </div>
             <div style={{ color: T.gold, fontSize: '1.2rem', flexShrink: 0 }}>→</div>
             <div style={{ flex: 1, background: T.surface, border: `1px solid ${unchanged ? T.border : T.gold}66`, borderRadius: 8, padding: '10px 12px' }}>
               <div style={{ fontSize: '0.64rem', color: unchanged ? T.muted : T.gold, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>이동 후</div>
               <div style={{ fontSize: '0.85rem', color: T.cream }}>{moveCellarObj?.name}</div>
-              <div style={{ fontSize: '0.75rem', color: T.muted }}>{moveSlot}번 칸</div>
+              <div style={{ fontSize: '0.75rem', color: T.muted }}>{moveSlot}번 칸 · {qty}병</div>
             </div>
           </div>
 
@@ -168,9 +179,24 @@ vivino USD 원본 → vivinoPrice
             </div>
           </div>
 
+          {/* 병 수 선택 — 2병 이상일 때만 노출 */}
+          {total > 1 && (
+            <div style={{ marginTop: 12 }}>
+              <label style={lbl}>이동할 병 수 <span style={{ color: T.muted, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(총 {total}병)</span></label>
+              <select value={qty} onChange={e => setMoveQty(parseInt(e.target.value))}>
+                {Array.from({ length: total }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}병{n === total ? ' (전체)' : ''}</option>)}
+              </select>
+              {remaining > 0 && (
+                <div style={{ fontSize: '0.74rem', color: T.muted, marginTop: 8 }}>
+                  {qty}병만 옮기고, <span style={{ color: T.cream }}>{c?.name} {wine.slot}번 칸</span>에 {remaining}병이 남습니다.
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
             <Btn variant="ghost" onClick={() => setMoving(false)}>취소</Btn>
-            <Btn variant="gold" onClick={saveMove} disabled={unchanged}>이동</Btn>
+            <Btn variant="gold" onClick={() => saveMove(qty)} disabled={unchanged}>이동</Btn>
           </div>
         </div>
       </div>
