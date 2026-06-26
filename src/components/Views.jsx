@@ -61,6 +61,21 @@ function normalizeWineText(text) {
     .replace(/\s+/g, ' ').trim()
 }
 
+// 이름 "지문" — 등급·수식어를 걷어낸 핵심 이름. 같은 와인의 다른 표기를 같은 값으로 모은다.
+// 예: "Château Margaux Grand Vin Premier Grand Cru Classé" → "chateau margaux"
+const NAME_STOPWORDS = [
+  'grand vin de', 'grand vin', 'premier grand cru classe', 'premier grand cru',
+  'grand cru classe', 'premier cru classe', 'deuxieme cru classe', 'troisieme cru classe',
+  'grand cru', 'premier cru', '1er cru', '1er grand cru classe', '1er grand cru',
+  'mis en bouteille au chateau', 'mis en bouteille', 'appellation controlee',
+  'appellation contrôlée', 'appellation', 'product of france', 'red wine', 'white wine',
+]
+function nameFingerprint(name) {
+  let s = normalizeWineText(name)
+  for (const w of NAME_STOPWORDS) s = s.split(normalizeWineText(w)).join(' ')
+  return s.replace(/\s+/g, ' ').trim()
+}
+
 function wineMatchesQuery(wine, query) {
   if (!query.trim()) return false
   const q = normalizeWineText(query)
@@ -140,7 +155,7 @@ export function SearchView({ wines, openDetail, openDrink, goSlot }) {
 }
 
 // ── List View ────────────────────────────────────────────────────
-export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany }) {
+export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany, onRename }) {
   const mobile = useIsMobile()
   const [sort, setSort] = useState('name')
   const [filterCellar, setFilterCellar] = useState('')
@@ -149,6 +164,8 @@ export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany })
   const [priceUpdating, setPriceUpdating] = useState(false)
   const [priceProgress, setPriceProgress] = useState({ current: 0, total: 0, name: '' })
   const [priceUpdateDone, setPriceUpdateDone] = useState(false)
+  const [groupSimilar, setGroupSimilar] = useState(false)  // 비슷한 이름 묶기 모드
+  const [chosenNames, setChosenNames] = useState({})        // 지문 → 통일할 이름
 
   const sorted = [...wines]
     .filter(w => !filterCellar || w.cellarId === filterCellar)
@@ -328,11 +345,85 @@ vivino USD 원본 → vivinoPrice
             <option value="market">시장가순</option>
             <option value="date">구매일순</option>
           </select>
+          <button onClick={() => setGroupSimilar(g => !g)} title="이름이 조금씩 다른 같은 와인을 묶어서 정리" style={{ background: groupSimilar ? T.gold : T.surface, color: groupSimilar ? T.bg : T.gold, border: `1px solid ${T.gold}66`, borderRadius: 8, padding: '7px 12px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            🔗 비슷한 이름 묶기{groupSimilar ? ' ✓' : ''}
+          </button>
         </div>
       </div>
 
       {sorted.length === 0
         ? <div style={{ textAlign: 'center', padding: '60px 0', color: T.muted }}><div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🍷</div><div>와인이 없습니다 — 추가해볼까요?</div></div>
+        : groupSimilar
+          ? (() => {
+              // 지문(등급·수식어 제거)이 같은 와인끼리 그룹화
+              const groups = {}
+              sorted.forEach(w => {
+                const fp = nameFingerprint(w.name) || (w.name || '').trim()
+                ;(groups[fp] = groups[fp] || []).push(w)
+              })
+              // 항목 수 많은 그룹 우선, 그 다음 이름순
+              const groupList = Object.entries(groups).sort((a, b) =>
+                b[1].length - a[1].length || (a[1][0].name || '').localeCompare(b[1][0].name || '', 'ko'))
+              const mixedCount = groupList.filter(([, items]) => new Set(items.map(w => w.name)).size > 1).length
+              return (
+                <div className="fade-in">
+                  <div style={{ fontSize: '0.78rem', color: T.muted, marginBottom: 14, lineHeight: 1.5 }}>
+                    이름이 조금씩 다른 같은 와인을 묶었습니다.
+                    {mixedCount > 0
+                      ? <> 표기가 갈린 <span style={{ color: T.gold }}>{mixedCount}개 그룹</span>은 이름을 하나로 통일할 수 있습니다.</>
+                      : ' 표기가 갈린 그룹은 없습니다.'}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {groupList.map(([fp, items]) => {
+                      const names = [...new Set(items.map(w => w.name))]
+                      const bottles = items.reduce((s, w) => s + (w.qty || 1), 0)
+                      const multiName = names.length > 1
+                      const chosen = chosenNames[fp] ?? [...names].sort((a, b) => a.length - b.length)[0]
+                      return (
+                        <div key={fp} style={{ background: T.card, border: `1px solid ${multiName ? T.gold + '66' : T.border}`, borderRadius: 12, padding: 14 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: multiName ? 12 : 8 }}>
+                            <div style={{ fontSize: '0.9rem', color: T.cream, fontWeight: 600, minWidth: 0 }}>
+                              {chosen} <span style={{ color: T.muted, fontWeight: 400, fontSize: '0.76rem' }}>· {items.length}항목 {bottles}병</span>
+                            </div>
+                            {multiName && (
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <select value={chosen} onChange={e => setChosenNames(p => ({ ...p, [fp]: e.target.value }))} style={{ width: 'auto', fontSize: '0.76rem', padding: '5px 8px', maxWidth: 280 }}>
+                                  {names.map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                                <button onClick={() => onRename && onRename(items.filter(w => w.name !== chosen).map(w => w.id), chosen)}
+                                  style={{ background: T.gold, color: T.bg, border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                  이 이름으로 통일
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {items.map(w => {
+                              const c = cellarById(w.cellarId)
+                              const willChange = multiName && w.name !== chosen
+                              return (
+                                <div key={w.id} onClick={() => openDetail(w.id)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem' }}
+                                  onMouseEnter={e => e.currentTarget.style.background = T.surface}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                >
+                                  <span style={{ flex: 1, minWidth: 0, color: willChange ? T.wineLight : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {willChange && <span title="통일 시 이 이름이 바뀝니다" style={{ marginRight: 4 }}>✏️</span>}
+                                    {w.name}{bottleBadge(w.bottleSize) ? ` ${bottleBadge(w.bottleSize)}` : ''}
+                                  </span>
+                                  <span style={{ color: T.gold, width: 46, textAlign: 'right', flexShrink: 0 }}>{w.vintage || '??'}</span>
+                                  <span style={{ color: T.text, width: 38, textAlign: 'right', flexShrink: 0 }}>{w.qty || 1}병</span>
+                                  <span style={{ color: T.muted, width: 130, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c?.name} {w.slot}칸</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()
         : mobile
           ? <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {sorted.map(w => {

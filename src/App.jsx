@@ -217,6 +217,16 @@ export default function App() {
     showToast(`🗑 ${ids.length}개 삭제 완료`, 'success')
   }
 
+  // 비슷한 이름 묶기 — 선택된 와인들의 이름을 하나로 통일
+  async function renameWines(ids, newName) {
+    if (!ids.length || !newName) return
+    for (const id of ids) {
+      const w = wines.find(x => x.id === id)
+      if (w && w.name !== newName) await updateWine(id, { name: newName })
+    }
+    showToast(`✓ ${ids.length}개 이름 통일 완료`, 'success')
+  }
+
   async function removeDrink(id) {
     setDrinkLog(p => p.filter(r => r.id !== id))
     try { await deleteDrink(id) } catch {}
@@ -274,7 +284,7 @@ export default function App() {
         {tab === 'cellar' && <CellarView {...shared} onDrink={openDrink} />}
         {tab === 'log'    && <DrinkLogView drinkLog={drinkLog} onDelete={removeDrink} />}
         {tab === 'search' && <SearchView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} />}
-        {tab === 'list'   && <ListView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} onDeleteMany={removeManyWines} />}
+        {tab === 'list'   && <ListView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} onDeleteMany={removeManyWines} onRename={renameWines} />}
         {tab === 'stats'  && <StatisticsView wines={wines} drinkLog={drinkLog} />}
       </main>
 
