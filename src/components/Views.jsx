@@ -366,9 +366,10 @@ vivino USD 원본 → vivinoPrice
                 const fp = nameFingerprint(w.name) || (w.name || '').trim()
                 ;(groups[fp] = groups[fp] || []).push(w)
               })
-              // 항목 수 많은 그룹 우선, 그 다음 이름순
+              // 지문(핵심 이름) 기준 정렬 — 같은 생산자/와인의 형제(예: Dom Pérignon …)가 인접하게 모인다.
+              // 지문이 같으면 표시 이름순으로 안정 정렬.
               const groupList = Object.entries(groups).sort((a, b) =>
-                b[1].length - a[1].length || (a[1][0].name || '').localeCompare(b[1][0].name || '', 'ko'))
+                a[0].localeCompare(b[0], 'ko') || (a[1][0].name || '').localeCompare(b[1][0].name || '', 'ko'))
               const mixedCount = groupList.filter(([, items]) => new Set(items.map(w => w.name)).size > 1).length
               return (
                 <div className="fade-in">
