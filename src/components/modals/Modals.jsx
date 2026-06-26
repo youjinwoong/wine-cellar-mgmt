@@ -378,45 +378,60 @@ async function getExifOrientation(file) {
 }
 
 async function resizeForVision(file) {
-  const orientation = await getExifOrientation(file)
-  return new Promise(resolve => {
-    const reader = new FileReader()
-    reader.onload = e => {
-      const img = new Image()
-      img.onload = () => {
-        const MAX = 2400
-        const needsRotate = orientation >= 5 && orientation <= 8
-        const srcW = img.width, srcH = img.height
-        const scale = Math.min(1, MAX / Math.max(srcW, srcH))
-        const w = Math.round(srcW * scale)
-        const h = Math.round(srcH * scale)
+  const MAX = 2400
+  // compressImage와 동일하게 createImageBitmap으로 EXIF를 한 번만 보정 (이중 회전 방지)
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const scale = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height))
+    const w = Math.round(bitmap.width * scale)
+    const h = Math.round(bitmap.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w; canvas.height = h
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h)
+    bitmap.close()
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
+    return { dataUrl, base64: dataUrl.split(',')[1] }
+  } catch {
+    // 폴백: createImageBitmap 미지원(구형 브라우저) — 수동 EXIF transform
+    const orientation = await getExifOrientation(file)
+    return new Promise(resolve => {
+      const reader = new FileReader()
+      reader.onload = e => {
+        const img = new Image()
+        img.onload = () => {
+          const needsRotate = orientation >= 5 && orientation <= 8
+          const srcW = img.width, srcH = img.height
+          const scale = Math.min(1, MAX / Math.max(srcW, srcH))
+          const w = Math.round(srcW * scale)
+          const h = Math.round(srcH * scale)
 
-        const canvas = document.createElement('canvas')
-        // orientation 5~8은 가로세로 스왑
-        canvas.width  = needsRotate ? h : w
-        canvas.height = needsRotate ? w : h
+          const canvas = document.createElement('canvas')
+          // orientation 5~8은 가로세로 스왑
+          canvas.width  = needsRotate ? h : w
+          canvas.height = needsRotate ? w : h
 
-        const ctx = canvas.getContext('2d')
-        // EXIF orientation별 변환 적용
-        switch (orientation) {
-          case 2: ctx.transform(-1, 0, 0, 1, w, 0); break
-          case 3: ctx.transform(-1, 0, 0, -1, w, h); break
-          case 4: ctx.transform(1, 0, 0, -1, 0, h); break
-          case 5: ctx.transform(0, 1, 1, 0, 0, 0); break
-          case 6: ctx.transform(0, 1, -1, 0, h, 0); break
-          case 7: ctx.transform(0, -1, -1, 0, h, w); break
-          case 8: ctx.transform(0, -1, 1, 0, 0, w); break
-          default: break
+          const ctx = canvas.getContext('2d')
+          // EXIF orientation별 변환 적용
+          switch (orientation) {
+            case 2: ctx.transform(-1, 0, 0, 1, w, 0); break
+            case 3: ctx.transform(-1, 0, 0, -1, w, h); break
+            case 4: ctx.transform(1, 0, 0, -1, 0, h); break
+            case 5: ctx.transform(0, 1, 1, 0, 0, 0); break
+            case 6: ctx.transform(0, 1, -1, 0, h, 0); break
+            case 7: ctx.transform(0, -1, -1, 0, h, w); break
+            case 8: ctx.transform(0, -1, 1, 0, 0, w); break
+            default: break
+          }
+          ctx.drawImage(img, 0, 0, w, h)
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
+          resolve({ dataUrl, base64: dataUrl.split(',')[1] })
         }
-        ctx.drawImage(img, 0, 0, w, h)
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
-        resolve({ dataUrl, base64: dataUrl.split(',')[1] })
+        img.src = e.target.result
       }
-      img.src = e.target.result
-    }
-    reader.readAsDataURL(file)
-  })
+      reader.readAsDataURL(file)
+    })
+  }
 }
 
 // 이미지 분석·가격검색 모두 Edge Function 프록시(callProxy) 경유
