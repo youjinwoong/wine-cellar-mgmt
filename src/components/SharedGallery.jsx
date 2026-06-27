@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { CELLARS, cellarById, T, krw, getDrinkingStatus, bottleBadge } from '../config/cellars.js'
+import { CELLARS, cellarById, T, krw, getDrinkingStatus, bottleBadge, nameFingerprint } from '../config/cellars.js'
 import { useIsMobile } from './ui.jsx'
 import { loadPublicWines } from '../lib/supabase.js'
 
@@ -13,6 +13,7 @@ export default function SharedGallery({ hidePrice = false }) {
   const [error, setError] = useState(false)
   const [sort, setSort] = useState('name')
   const [filterCellar, setFilterCellar] = useState('')
+  const [groupSimilar, setGroupSimilar] = useState(false)  // 비슷한 이름 묶기 (읽기 전용)
 
   useEffect(() => {
     loadPublicWines()
@@ -70,10 +71,57 @@ export default function SharedGallery({ hidePrice = false }) {
             <option value="vintage">빈티지순</option>
             {!hidePrice && <option value="market">시장가순</option>}
           </select>
+          <button onClick={() => setGroupSimilar(g => !g)} title="이름이 조금씩 다른 같은 와인을 묶어서 보기" style={{ background: groupSimilar ? T.gold : T.surface, color: groupSimilar ? T.bg : T.gold, border: `1px solid ${T.gold}66`, borderRadius: 8, padding: '7px 12px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>
+            🔗 비슷한 이름 묶기{groupSimilar ? ' ✓' : ''}
+          </button>
         </div>
 
         {sorted.length === 0
           ? <div style={{ textAlign: 'center', padding: '60px 0', color: T.muted }}><div style={{ fontSize: '2.5rem', marginBottom: 12 }}>🍷</div><div>표시할 와인이 없습니다.</div></div>
+          : groupSimilar
+            ? (() => {
+                // 지문(핵심 이름)이 같은 와인끼리 그룹화 — 읽기 전용 (통일 기능 없음)
+                const groups = {}
+                sorted.forEach(w => {
+                  const fp = nameFingerprint(w.name) || (w.name || '').trim()
+                  ;(groups[fp] = groups[fp] || []).push(w)
+                })
+                // 지문(핵심 이름)순 정렬 — 형제 와인이 인접하게
+                const groupList = Object.entries(groups).sort((a, b) =>
+                  a[0].localeCompare(b[0], 'ko') || (a[1][0].name || '').localeCompare(b[1][0].name || '', 'ko'))
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {groupList.map(([fp, items]) => {
+                      const names = [...new Set(items.map(w => w.name))]
+                      const bottles = items.reduce((s, w) => s + (w.qty || 1), 0)
+                      const rep = [...names].sort((a, b) => a.length - b.length)[0]
+                      return (
+                        <div key={fp} style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14 }}>
+                          <div style={{ fontSize: '0.9rem', color: T.cream, fontWeight: 600, marginBottom: 8 }}>
+                            {rep} <span style={{ color: T.muted, fontWeight: 400, fontSize: '0.76rem' }}>· {items.length}항목 {bottles}병</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {items.map(w => {
+                              const c = cellarById(w.cellarId)
+                              return (
+                                <div key={w.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '6px 8px', borderRadius: 6, fontSize: '0.8rem' }}>
+                                  <span style={{ flex: 1, minWidth: 0, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {w.name}{bottleBadge(w.bottleSize) ? ` ${bottleBadge(w.bottleSize)}` : ''}
+                                  </span>
+                                  <span style={{ color: T.gold, width: 46, textAlign: 'right', flexShrink: 0 }}>{w.vintage || '??'}</span>
+                                  <span style={{ color: T.text, width: 38, textAlign: 'right', flexShrink: 0 }}>{w.qty || 1}병</span>
+                                  {!hidePrice && <span style={{ color: w.wineSearcherPrice ? T.gold : T.muted, width: 110, textAlign: 'right', flexShrink: 0 }}>{w.wineSearcherPrice ? krw(w.wineSearcherPrice) : '-'}</span>}
+                                  <span style={{ color: T.muted, width: 130, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c?.name} {w.slot}칸</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()
           : mobile
             ? <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {sorted.map(w => {

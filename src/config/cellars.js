@@ -118,3 +118,35 @@ export function copyToClipboard(text) {
     document.body.removeChild(el)
   })
 }
+
+// ── 와인 이름 정규화 / 지문 (검색·비슷한 이름 묶기 공용) ──────────
+// normalizeWineText: 소문자·악센트·기호 정리.
+// nameFingerprint: 등급·수식어와 타입/지역 꼬리표를 걷어낸 "핵심 이름".
+//   같은 와인의 다른 표기를 같은 값으로 모은다.
+//   주의: Brut/Rosé/Classic/Sec 등 제품을 실제로 구분하는 단어는 일부러 남긴다.
+export function normalizeWineText(text) {
+  if (!text) return ''
+  return text.toLowerCase()
+    .replace(/château/gi, 'chateau')
+    .replace(/é/g, 'e').replace(/è/g, 'e').replace(/ê/g, 'e')
+    .replace(/à/g, 'a').replace(/â/g, 'a')
+    .replace(/ô/g, 'o').replace(/î/g, 'i')
+    .replace(/[·•\-]/g, ' ')
+    .replace(/\s+/g, ' ').trim()
+}
+
+export const NAME_STOPWORDS = [
+  'grand vin de', 'grand vin', 'premier grand cru classe', 'premier grand cru',
+  'grand cru classe', 'premier cru classe', 'deuxieme cru classe', 'troisieme cru classe',
+  'grand cru', 'premier cru', '1er cru', '1er grand cru classe', '1er grand cru',
+  'mis en bouteille au chateau', 'mis en bouteille', 'appellation controlee',
+  'appellation contrôlée', 'appellation', 'product of france', 'red wine', 'white wine',
+  // 타입/거품 종류/지역 꼬리표 — 같은 와인에 붙었다 안 붙었다 하는 단어들
+  'sparkling wine', 'sparkling', 'champagne', 'cremant', 'crémant', 'cava', 'prosecco',
+]
+export function nameFingerprint(name) {
+  let s = ` ${normalizeWineText(name)} `
+  // 단어 단위로만 제거 (앞뒤 공백 기준) — 다른 단어 일부가 잘리지 않도록
+  for (const w of NAME_STOPWORDS) s = s.split(` ${normalizeWineText(w)} `).join(' ')
+  return s.replace(/\s+/g, ' ').trim()
+}
