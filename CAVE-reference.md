@@ -79,6 +79,9 @@ src/
   구매일 폴백(구매 2년 미만 '마시기 좋음', 2년 이상·구매일 없음 '빨리 마셔야').
   🔮 음용시기 추정 버튼(callAI/callProxy 경유 → drinkingFrom/to 저장).
   대시보드에 '빨리 마셔야'·'지금 절정' 요약 카드(클릭 시 음용 적기 탭 이동).
+- 병 용량 배지를 셀러 뷰·대시보드에도 적용 + 단일 등록(AddWineModal)에 병 용량 선택(커밋 712d9f8).
+- 이름 묶기 "수준 3"(커밋 e2efd0f): 비슷한 이름 묶기 안에서 이름·빈티지·셀러·칸이 모두 같은
+  진짜 중복 레코드를 한 줄로 묶어 🔗 병합(병 수 합산). App.jsx mergeWines + ListView onMerge.
 
 ## Supabase 서버 측 구성 (코드 저장소 밖)
 - Edge Function: `anthropic-proxy` (verify_jwt=true)
@@ -90,7 +93,7 @@ src/
   (security definer + set search_path = public)
 
 ## 아직 미적용 (다음 작업 후보)
-- 단일 등록(AddWineModal)에 용량 선택
-- 셀러 뷰·대시보드에 용량 배지 (CellarView.jsx, Dashboard.jsx)
-- 이름 묶기 "수준 3"(빈티지까지 같은 진짜 중복을 한 줄로 병합)
-- 취향 프로필, AI 추천("오늘 뭐 마실까"), 위시리스트, 컬렉션 가치 평가
+- 취향 프로필 (음주 기록 기반 선호 품종·지역·평점 분석)
+- AI 추천("오늘 뭐 마실까")
+- 위시리스트
+- 컬렉션 가치 평가
