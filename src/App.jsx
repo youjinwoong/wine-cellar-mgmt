@@ -227,6 +227,18 @@ export default function App() {
     showToast(`✓ ${ids.length}개 이름 통일 완료`, 'success')
   }
 
+  // 수준 3: 진짜 중복 병합 — 이름·빈티지·셀러·칸이 모두 같은 레코드들을 한 레코드로 합치고 병 수 합산
+  async function mergeWines(ids) {
+    if (!ids || ids.length < 2) return
+    const group = ids.map(id => wines.find(w => w.id === id)).filter(Boolean)
+    if (group.length < 2) return
+    const keep = group[0]
+    const totalQty = group.reduce((s, w) => s + (w.qty || 1), 0)
+    await updateWine(keep.id, { qty: totalQty })
+    for (const w of group.slice(1)) await removeWine(w.id)
+    showToast(`🔗 ${group.length}개 레코드를 ${totalQty}병으로 병합`, 'success')
+  }
+
   async function removeDrink(id) {
     setDrinkLog(p => p.filter(r => r.id !== id))
     try { await deleteDrink(id) } catch {}
@@ -285,7 +297,7 @@ export default function App() {
         {tab === 'drinking' && <DrinkingWindowView wines={wines} openDetail={openDetail} onUpdate={updateWine} />}
         {tab === 'log'    && <DrinkLogView drinkLog={drinkLog} onDelete={removeDrink} />}
         {tab === 'search' && <SearchView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} />}
-        {tab === 'list'   && <ListView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} onDeleteMany={removeManyWines} onRename={renameWines} />}
+        {tab === 'list'   && <ListView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} onDeleteMany={removeManyWines} onRename={renameWines} onMerge={mergeWines} />}
         {tab === 'stats'  && <StatisticsView wines={wines} drinkLog={drinkLog} />}
       </main>
 

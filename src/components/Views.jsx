@@ -129,7 +129,7 @@ export function SearchView({ wines, openDetail, openDrink, goSlot }) {
 }
 
 // ── List View ────────────────────────────────────────────────────
-export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany, onRename }) {
+export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany, onRename, onMerge }) {
   const mobile = useIsMobile()
   const [sort, setSort] = useState('name')
   const [filterCellar, setFilterCellar] = useState('')
@@ -372,26 +372,57 @@ vivino USD 원본 → vivinoPrice
                               </div>
                             )}
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {items.map(w => {
-                              const c = cellarById(w.cellarId)
-                              const willChange = multiName && w.name !== chosen
-                              return (
-                                <div key={w.id} onClick={() => openDetail(w.id)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem' }}
-                                  onMouseEnter={e => e.currentTarget.style.background = T.surface}
-                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                >
-                                  <span style={{ flex: 1, minWidth: 0, color: willChange ? T.wineLight : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {willChange && <span title="통일 시 이 이름이 바뀝니다" style={{ marginRight: 4 }}>✏️</span>}
-                                    {w.name}{bottleBadge(w.bottleSize) ? ` ${bottleBadge(w.bottleSize)}` : ''}
-                                  </span>
-                                  <span style={{ color: T.gold, width: 46, textAlign: 'right', flexShrink: 0 }}>{w.vintage || '??'}</span>
-                                  <span style={{ color: T.text, width: 38, textAlign: 'right', flexShrink: 0 }}>{w.qty || 1}병</span>
-                                  <span style={{ color: T.muted, width: 130, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c?.name} {w.slot}칸</span>
+                          {(() => {
+                            // 수준 3: 빈티지·셀러·칸까지 같은 진짜 중복 레코드를 한 줄로 묶는다
+                            const clusterMap = {}
+                            items.forEach(w => {
+                              const key = `${w.name}|${w.vintage || ''}|${w.cellarId}|${w.slot}`
+                              ;(clusterMap[key] = clusterMap[key] || []).push(w)
+                            })
+                            const clusters = Object.values(clusterMap)
+                            const dupCount = clusters.filter(cl => cl.length > 1).length
+                            return (
+                              <>
+                                {dupCount > 0 && (
+                                  <div style={{ fontSize: '0.72rem', color: T.gold, marginBottom: 6 }}>
+                                    🔁 빈티지·위치까지 같은 중복 {dupCount}건 — 한 레코드로 병합할 수 있습니다
+                                  </div>
+                                )}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                  {clusters.map(cl => {
+                                    const w = cl[0]
+                                    const c = cellarById(w.cellarId)
+                                    const willChange = multiName && w.name !== chosen
+                                    const dup = cl.length > 1
+                                    const clQty = cl.reduce((s, x) => s + (x.qty || 1), 0)
+                                    return (
+                                      <div key={w.id} onClick={() => openDetail(w.id)} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '6px 8px', borderRadius: 6, cursor: 'pointer', fontSize: '0.8rem', background: dup ? T.gold + '11' : 'transparent' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = dup ? T.gold + '22' : T.surface}
+                                        onMouseLeave={e => e.currentTarget.style.background = dup ? T.gold + '11' : 'transparent'}
+                                      >
+                                        <span style={{ flex: 1, minWidth: 0, color: willChange ? T.wineLight : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {willChange && <span title="통일 시 이 이름이 바뀝니다" style={{ marginRight: 4 }}>✏️</span>}
+                                          {dup && <span title="빈티지·위치까지 같은 중복 레코드" style={{ marginRight: 4, color: T.gold }}>🔁</span>}
+                                          {w.name}{bottleBadge(w.bottleSize) ? ` ${bottleBadge(w.bottleSize)}` : ''}
+                                          {dup && <span style={{ color: T.muted, fontSize: '0.72rem', marginLeft: 6 }}>({cl.length}개 레코드)</span>}
+                                        </span>
+                                        <span style={{ color: T.gold, width: 46, textAlign: 'right', flexShrink: 0 }}>{w.vintage || '??'}</span>
+                                        <span style={{ color: T.text, width: 38, textAlign: 'right', flexShrink: 0 }}>{clQty}병</span>
+                                        <span style={{ color: T.muted, width: 130, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c?.name} {w.slot}칸</span>
+                                        {dup && (
+                                          <button onClick={e => { e.stopPropagation(); onMerge && onMerge(cl.map(x => x.id)) }}
+                                            title={`${cl.length}개 레코드를 1개(${clQty}병)로 병합`}
+                                            style={{ background: T.gold, color: T.bg, border: 'none', borderRadius: 6, padding: '4px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                            🔗 병합
+                                          </button>
+                                        )}
+                                      </div>
+                                    )
+                                  })}
                                 </div>
-                              )
-                            })}
-                          </div>
+                              </>
+                            )
+                          })()}
                         </div>
                       )
                     })}
