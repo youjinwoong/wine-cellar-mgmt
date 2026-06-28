@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CELLARS, getSlots, T, krw, getDrinkingStatus } from '../config/cellars.js'
+import { CELLARS, getSlots, T, krw, getDrinkingStatus, bottleBadge } from '../config/cellars.js'
 import { useIsMobile } from './ui.jsx'
 
 export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCellarId, openDetail }) {
@@ -120,7 +120,10 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
                     onMouseEnter={e=>e.currentTarget.style.color=T.gold}
                     onMouseLeave={e=>e.currentTarget.style.color=T.cream}
                   >
-                    <span>{w.name}</span>
+                    <span style={{ display:'flex', alignItems:'center', gap:6, minWidth:0 }}>
+                      <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</span>
+                      {bottleBadge(w.bottleSize) && <span style={{ color:T.wineLight, fontWeight:600, fontSize:'0.72rem', flexShrink:0 }}>{bottleBadge(w.bottleSize)}</span>}
+                    </span>
                     <span style={{ color:T.gold, flexShrink:0, marginLeft:8 }}>{w.vintage}</span>
                   </div>
                 ))}
@@ -136,7 +139,10 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
                     onMouseEnter={e=>e.currentTarget.style.color=T.wineLight}
                     onMouseLeave={e=>e.currentTarget.style.color=T.cream}
                   >
-                    <span>{w.name}</span>
+                    <span style={{ display:'flex', alignItems:'center', gap:6, minWidth:0 }}>
+                      <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</span>
+                      {bottleBadge(w.bottleSize) && <span style={{ color:T.wineLight, fontWeight:600, fontSize:'0.72rem', flexShrink:0 }}>{bottleBadge(w.bottleSize)}</span>}
+                    </span>
                     <span style={{ color:T.wineLight, flexShrink:0, marginLeft:8 }}>{w.qty || 1}병 남음</span>
                   </div>
                 ))}
@@ -158,7 +164,10 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
                   onMouseEnter={e=>e.currentTarget.style.borderColor=T.gold}
                   onMouseLeave={e=>e.currentTarget.style.borderColor=T.gold+'44'}
                 >
-                  <div style={{ fontFamily:'Cormorant Garamond,serif', fontSize:'1rem', fontWeight:600, color:T.cream, marginBottom:4 }}>{w.name}</div>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                    <div style={{ fontFamily:'Cormorant Garamond,serif', fontSize:'1rem', fontWeight:600, color:T.cream, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{w.name}</div>
+                    {bottleBadge(w.bottleSize) && <span style={{ fontSize:'0.7rem', color:T.wineLight, fontWeight:600, flexShrink:0 }}>{bottleBadge(w.bottleSize)}</span>}
+                  </div>
                   <div style={{ color:T.gold, fontWeight:600, marginBottom:6 }}>{w.vintage}</div>
                   {s && <div style={{ fontSize:'0.72rem', color:s.color, background:s.color+'22', borderRadius:6, padding:'3px 8px', display:'inline-block', marginBottom:8 }}>{s.icon} {s.label}</div>}
                   {s?.from && <div style={{ fontSize:'0.7rem', color:T.muted }}>음용 적기: {s.from}~{s.to}년</div>}

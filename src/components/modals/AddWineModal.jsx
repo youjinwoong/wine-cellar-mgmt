@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CELLARS, getSlots, cellarById, T, uid, krw, callAI } from '../../config/cellars.js'
+import { CELLARS, getSlots, cellarById, T, uid, krw, callAI, BOTTLE_SIZES } from '../../config/cellars.js'
 import { Btn, lbl, ImagePicker } from '../ui.jsx'
 
 export default function AddWineModal({ pre = {}, onAdd, onClose }) {
@@ -8,6 +8,7 @@ export default function AddWineModal({ pre = {}, onAdd, onClose }) {
   const [form, setForm] = useState({
     name: '', vintage: '', qty: 1, price: '', purchaseDate: today,
     cellarId: initCellar, slot: pre.slot || '1',
+    bottleSize: 750,
     imageUrl: '', notes: '',
   })
   const [aiLoad, setAiLoad] = useState(false)
@@ -66,6 +67,7 @@ vivino USD 원본 → vivinoPrice
       vintage: form.vintage ? parseInt(form.vintage) : null,
       qty: parseInt(String(form.qty)) || 1,
       price: parseInt(String(form.price).replace(/,/g, '')) || 0,
+      bottleSize: parseInt(String(form.bottleSize)) || 750,
     })
   }
 
@@ -137,6 +139,15 @@ vivino USD 원본 → vivinoPrice
               {getSlots(curCellar).map(s => <option key={s} value={s}>{s}번 칸</option>)}
             </select>
           </div>
+        </div>
+        <div style={G}>
+          <div>
+            <label style={lbl}>병 용량</label>
+            <select value={form.bottleSize} onChange={e => set('bottleSize', e.target.value)}>
+              {BOTTLE_SIZES.map(b => <option key={b.ml} value={b.ml}>{b.label}</option>)}
+            </select>
+          </div>
+          <div></div>
         </div>
 
         <ImagePicker

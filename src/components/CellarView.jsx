@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CELLARS, getSlots, cellarById, T, krw, getDrinkingStatus } from '../config/cellars.js'
+import { CELLARS, getSlots, cellarById, T, krw, getDrinkingStatus, bottleBadge } from '../config/cellars.js'
 import { Btn, useIsMobile } from './ui.jsx'
 
 export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCellarId, openAdd, openDetail, onDrink, onDeleteMany }) {
@@ -187,7 +187,10 @@ export default function CellarView({ wines, winesIn, bottlesIn, cellarId, setCel
                           : <div style={{ width: 32, height: 46, background: T.surface, borderRadius: 4, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', border: `1px solid ${T.border}` }}>🍷</div>
                         }
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 500, color: T.cream, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                            <div style={{ fontSize: '0.9rem', fontWeight: 500, color: T.cream, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
+                            {bottleBadge(w.bottleSize) && <span style={{ fontSize: '0.7rem', color: T.wineLight, fontWeight: 600, flexShrink: 0 }}>{bottleBadge(w.bottleSize)}</span>}
+                          </div>
                           <div style={{ fontSize: '0.75rem', color: T.muted, marginTop: 2 }}>
                             {w.vintage && <span style={{ color: T.gold, marginRight: 8 }}>{w.vintage}</span>}
                             <span style={{ marginRight: 8 }}>{w.qty || 1}병</span>
