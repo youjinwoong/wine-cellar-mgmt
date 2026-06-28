@@ -46,17 +46,26 @@ export function getDrinkingStatus(wine) {
 
   if (!from || !to) {
     // 빈티지 기반 추정
-    if (!wine.vintage) return null
+    if (!wine.vintage) {
+      // 빈티지도 명시적 음용시기도 없을 때 — 구매일(purchaseDate) 기반 폴백
+      if (wine.purchaseDate) {
+        const pYear = new Date(wine.purchaseDate).getFullYear()
+        if (year - pYear < 2) return { status: 'ready',   label: '마시기 좋음', color: '#4a8a5e', icon: '🟢' }
+        return                       { status: 'decline', label: '빨리 마셔야', color: T.muted,   icon: '⚪' }
+      }
+      // 구매일조차 없으면 — 우선 마셔야 할 대상으로 분류
+      return { status: 'decline', label: '빨리 마셔야', color: T.muted, icon: '⚪' }
+    }
     const age = year - wine.vintage
     if (age < 5)  return { status: 'young',  label: '숙성 중',     color: '#5b8dd9', icon: '🔵' }
     if (age < 15) return { status: 'ready',  label: '마시기 좋음', color: '#4a8a5e', icon: '🟢' }
     if (age < 30) return { status: 'peak',   label: '절정',        color: T.gold,    icon: '⭐' }
-    return            { status: 'decline', label: '절정 지남',   color: T.muted,   icon: '⚪' }
+    return            { status: 'decline', label: '빨리 마셔야',   color: T.muted,   icon: '⚪' }
   }
 
   if (year < from)  return { status: 'young',  label: `${from}년부터`,   color: '#5b8dd9', icon: '🔵', from, to }
   if (year <= to)   return { status: 'peak',   label: '지금 마시기 좋음', color: '#4a8a5e', icon: '🟢', from, to }
-  return              { status: 'decline', label: '절정 지남',          color: T.muted,   icon: '⚪', from, to }
+  return              { status: 'decline', label: '빨리 마셔야',          color: T.muted,   icon: '⚪', from, to }
 }
 
 // ── 이미지 압축 ──────────────────────────────────────────────────

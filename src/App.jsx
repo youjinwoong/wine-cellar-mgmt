@@ -9,7 +9,7 @@ import {
 import Header from './components/Header.jsx'
 import Dashboard from './components/Dashboard.jsx'
 import CellarView from './components/CellarView.jsx'
-import { SearchView, ListView, DrinkLogView, StatisticsView } from './components/Views.jsx'
+import { SearchView, ListView, DrinkLogView, StatisticsView, DrinkingWindowView } from './components/Views.jsx'
 import AddWineModal from './components/modals/AddWineModal.jsx'
 import { DetailModal, DrinkModal, SettingsModal, BulkImportModal } from './components/modals/Modals.jsx'
 import { Toast } from './components/ui.jsx'
@@ -282,6 +282,7 @@ export default function App() {
       <main style={{ flex: 1, padding: '24px 28px', maxWidth: 1060, margin: '0 auto', width: '100%', paddingBottom: 100 }}>
         {tab === 'dash'   && <Dashboard {...shared} setTab={setTab} openDetail={openDetail} />}
         {tab === 'cellar' && <CellarView {...shared} onDrink={openDrink} />}
+        {tab === 'drinking' && <DrinkingWindowView wines={wines} openDetail={openDetail} onUpdate={updateWine} />}
         {tab === 'log'    && <DrinkLogView drinkLog={drinkLog} onDelete={removeDrink} />}
         {tab === 'search' && <SearchView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} />}
         {tab === 'list'   && <ListView wines={wines} openDetail={openDetail} openDrink={openDrink} goSlot={goSlot} onDeleteMany={removeManyWines} onRename={renameWines} />}

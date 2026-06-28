@@ -17,6 +17,20 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
   const tooYoung  = wines.filter(w => { const s = getDrinkingStatus(w); return s?.status === 'young' })
   const lowStock  = wines.filter(w => (w.qty || 1) <= 1)
 
+  // 음용 적기 요약 — 같은 와인(name+vintage)은 "이름 + N병"으로 묶어서 집계
+  const dwGroupKey = w => `${(w.name || '').trim()}|||${w.vintage || ''}`
+  const declineGroups = {}, peakGroups = {}
+  wines.forEach(w => {
+    const s = getDrinkingStatus(w)
+    const k = dwGroupKey(w)
+    if (s?.status === 'decline') (declineGroups[k] = declineGroups[k] || { name: w.name, vintage: w.vintage, qty: 0 }).qty += (w.qty || 1)
+    else if (s?.status === 'peak') (peakGroups[k] = peakGroups[k] || { name: w.name, vintage: w.vintage, qty: 0 }).qty += (w.qty || 1)
+  })
+  const declineList = Object.values(declineGroups).sort((a, b) => (a.vintage || 9999) - (b.vintage || 9999))
+  const peakList    = Object.values(peakGroups).sort((a, b) => (a.vintage || 9999) - (b.vintage || 9999))
+  const declineBottles = declineList.reduce((s, g) => s + g.qty, 0)
+  const peakBottles    = peakList.reduce((s, g) => s + g.qty, 0)
+
   // 추천 와인 (지금 마시기 좋은 것 중 빈티지 오래된 순)
   const recommended = [...drinkNow].sort((a, b) => (a.vintage || 0) - (b.vintage || 0)).slice(0, 3)
 
@@ -46,6 +60,35 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
           </div>
         ))}
       </div>
+
+      {/* 음용 적기 요약 — 클릭 시 음용 적기 탭으로 이동 */}
+      {(declineList.length > 0 || peakList.length > 0) && (
+        <div style={{ display:'grid', gridTemplateColumns: mobile?'1fr':'repeat(2,1fr)', gap:12, marginBottom:24 }}>
+          {[
+            { list: declineList, bottles: declineBottles, title:'빨리 마셔야', icon:'⚪', color:T.muted },
+            { list: peakList,    bottles: peakBottles,    title:'지금 절정',   icon:'🟢', color:'#4a8a5e' },
+          ].filter(c => c.list.length > 0).map(c => (
+            <div key={c.title} onClick={() => setTab('drinking')} style={{ background:c.color+'18', border:`1px solid ${c.color}44`, borderRadius:12, padding:16, cursor:'pointer', transition:'border-color 0.2s' }}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=c.color}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=c.color+'44'}
+            >
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                <span style={{ fontSize:'0.78rem', color:c.color, fontWeight:700 }}>{c.icon} {c.title}</span>
+                <span style={{ fontSize:'0.72rem', color:T.muted }}>{c.list.length}종 {c.bottles}병 ›</span>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                {c.list.slice(0,4).map(g => (
+                  <div key={`${g.name}-${g.vintage}`} style={{ fontSize:'0.8rem', color:T.cream, display:'flex', justifyContent:'space-between', gap:8 }}>
+                    <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{g.name}{g.vintage ? ` ${g.vintage}` : ''}</span>
+                    <span style={{ color:c.color, flexShrink:0 }}>{g.qty}병</span>
+                  </div>
+                ))}
+                {c.list.length > 4 && <div style={{ fontSize:'0.72rem', color:T.muted, marginTop:2 }}>외 {c.list.length - 4}종…</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 가치 비교 */}
       {marketValue > 0 && (

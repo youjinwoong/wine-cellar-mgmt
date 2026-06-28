@@ -4,6 +4,7 @@ import { Btn, useIsMobile } from './ui.jsx'
 const TABS = [
   { id:'dash',   label:'대시보드', icon:'🏠' },
   { id:'cellar', label:'셀러 뷰',  icon:'🍾' },
+  { id:'drinking', label:'음용 적기', icon:'⏰' },
   { id:'log',    label:'음주 기록', icon:'📖' },
   { id:'stats',  label:'통계',     icon:'📊' },
   { id:'search', label:'검색',     icon:'🔍' },
