@@ -73,6 +73,12 @@ src/
 - 사진 일괄 입력: 가격 검색 수동 트리거, 라벨 영역별 크롭 썸네일, 검토 화면 사진 교체, EXIF 보정
 - 비슷한 이름 묶기/이름 통일(nameFingerprint, 방안 B — Brut/Rosé 등 구분 단어는 남김)
 - 공개 갤러리(?gallery=1, ?gallery=1&price=0)
+- 음용 적기(커밋 b8a750a): 전용 "음용 적기" 탭(⏰, Header) + DrinkingWindowView.
+  status 순서 빨리 마셔야→지금 절정→마시기 좋음→곧 절정→숙성 중, 동일 와인 "이름+N병" 묶음.
+  getDrinkingStatus: decline 라벨 '빨리 마셔야'로 통일, 빈티지·drinkingFrom/to 모두 없으면
+  구매일 폴백(구매 2년 미만 '마시기 좋음', 2년 이상·구매일 없음 '빨리 마셔야').
+  🔮 음용시기 추정 버튼(callAI/callProxy 경유 → drinkingFrom/to 저장).
+  대시보드에 '빨리 마셔야'·'지금 절정' 요약 카드(클릭 시 음용 적기 탭 이동).
 
 ## Supabase 서버 측 구성 (코드 저장소 밖)
 - Edge Function: `anthropic-proxy` (verify_jwt=true)
@@ -87,4 +93,4 @@ src/
 - 단일 등록(AddWineModal)에 용량 선택
 - 셀러 뷰·대시보드에 용량 배지 (CellarView.jsx, Dashboard.jsx)
 - 이름 묶기 "수준 3"(빈티지까지 같은 진짜 중복을 한 줄로 병합)
-- 음용 적기 대시보드, 취향 프로필, AI 추천("오늘 뭐 마실까"), 위시리스트, 컬렉션 가치 평가
+- 취향 프로필, AI 추천("오늘 뭐 마실까"), 위시리스트, 컬렉션 가치 평가
