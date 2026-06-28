@@ -128,6 +128,16 @@ export function SearchView({ wines, openDetail, openDrink, goSlot }) {
   )
 }
 
+// 음용 시기 상태 → 목록용 짧은 라벨 (칼럼이 좁으므로 축약, 전체 라벨은 title 툴팁)
+function drinkShortLabel(s) {
+  if (!s) return ''
+  if (s.status === 'peak')    return '절정'
+  if (s.status === 'ready')   return '좋음'
+  if (s.status === 'decline') return '빨리'
+  if (s.status === 'young')   return s.from ? `${s.from}년~` : '숙성중'
+  return s.label
+}
+
 // ── List View ────────────────────────────────────────────────────
 export function ListView({ wines, openDetail, openDrink, goSlot, onDeleteMany, onRename, onMerge }) {
   const mobile = useIsMobile()
@@ -265,7 +275,7 @@ vivino USD 원본 → vivinoPrice
     setTimeout(() => setPriceUpdateDone(false), 4000)
   }
 
-  const COLS = '28px 48px 1.6fr 72px 56px 140px 130px'
+  const COLS = '28px 48px 1.6fr 72px 56px 88px 140px 130px'
 
   return (
     <div className="fade-in">
@@ -407,6 +417,9 @@ vivino USD 원본 → vivinoPrice
                                           {dup && <span style={{ color: T.muted, fontSize: '0.72rem', marginLeft: 6 }}>({cl.length}개 레코드)</span>}
                                         </span>
                                         <span style={{ color: T.gold, width: 46, textAlign: 'right', flexShrink: 0 }}>{w.vintage || '??'}</span>
+                                        {(() => { const s = getDrinkingStatus(w); return s
+                                          ? <span title={s.label} style={{ fontSize: '0.66rem', color: s.color, background: s.color + '22', borderRadius: 5, padding: '1px 5px', whiteSpace: 'nowrap', flexShrink: 0 }}>{s.icon} {drinkShortLabel(s)}</span>
+                                          : null })()}
                                         <span style={{ color: T.text, width: 38, textAlign: 'right', flexShrink: 0 }}>{clQty}병</span>
                                         <span style={{ color: T.muted, width: 130, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c?.name} {w.slot}칸</span>
                                         {dup && (
@@ -448,6 +461,7 @@ vivino USD 원본 → vivinoPrice
                           <span>{w.qty || 1}병</span>
                           {w.price > 0 && <span>{krw(w.price)}</span>}
                           {w.wineSearcherPrice > 0 && <span style={{ color: T.gold }}>시장가 {krw(w.wineSearcherPrice)}</span>}
+                          {(() => { const s = getDrinkingStatus(w); return s ? <span style={{ color: s.color }}>{s.icon} {s.label}</span> : null })()}
                         </div>
                         <div style={{ fontSize: '0.68rem', color: T.muted, marginTop: 2 }}>{c?.name} 셀러 {w.slot}번 칸</div>
                       </div>
@@ -467,6 +481,7 @@ vivino USD 원본 → vivinoPrice
                 <span>이름</span>
                 <span style={{ textAlign: 'center' }}>빈티지</span>
                 <span style={{ textAlign: 'right' }}>수량</span>
+                <span style={{ textAlign: 'center' }}>음용시기</span>
                 <span style={{ textAlign: 'right', color: '#C9A84C' }}>시장가(₩)</span>
                 <span>셀러 · 위치</span>
               </div>
@@ -494,6 +509,11 @@ vivino USD 원본 → vivinoPrice
                     </div>
                     <span style={{ fontSize: '0.875rem', color: T.gold, fontWeight: 500, textAlign: 'center' }}>{w.vintage || '??'}</span>
                     <span style={{ fontSize: '0.875rem', color: T.text, textAlign: 'right' }}>{w.qty || 1}병</span>
+                    <div style={{ textAlign: 'center' }}>
+                      {(() => { const s = getDrinkingStatus(w); return s
+                        ? <span title={s.label} style={{ fontSize: '0.66rem', color: s.color, background: s.color + '22', borderRadius: 5, padding: '2px 6px', whiteSpace: 'nowrap' }}>{s.icon} {drinkShortLabel(s)}</span>
+                        : <span style={{ color: T.muted }}>-</span> })()}
+                    </div>
                     <span style={{ fontSize: '0.875rem', color: w.wineSearcherPrice ? T.gold : T.muted, fontWeight: w.wineSearcherPrice ? 600 : 400, textAlign: 'right' }}>{w.wineSearcherPrice ? krw(w.wineSearcherPrice) : '-'}</span>
                     <div onClick={e => { e.stopPropagation(); goSlot(w.cellarId, w.slot) }} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, background: T.surface, borderRadius: 8, padding: '5px 10px', border: `1px solid ${T.border}`, transition: 'border-color 0.15s' }}
                       onMouseEnter={e => e.currentTarget.style.borderColor = T.gold}
