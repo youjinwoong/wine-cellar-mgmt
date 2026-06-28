@@ -9,6 +9,13 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
   const totalBottles   = wines.reduce((s, w) => s + (w.qty || 1), 0)
   const purchaseValue  = wines.reduce((s, w) => s + (w.price || 0) * (w.qty || 1), 0)
   const marketValue    = wines.reduce((s, w) => s + (w.wineSearcherPrice || 0) * (w.qty || 1), 0)
+  // 평가 차익은 구매가·시장가가 모두 있는 와인만 비교 (한쪽만 있으면 왜곡되므로 제외)
+  const valued         = wines.filter(w => (w.price || 0) > 0 && (w.wineSearcherPrice || 0) > 0)
+  const valuedPurchase = valued.reduce((s, w) => s + w.price * (w.qty || 1), 0)
+  const valuedMarket   = valued.reduce((s, w) => s + w.wineSearcherPrice * (w.qty || 1), 0)
+  const valuedGain     = valuedMarket - valuedPurchase
+  const pricedCount    = wines.filter(w => (w.price || 0) > 0).length          // 구매가 입력된 와인 종 수
+  const marketCount    = wines.filter(w => (w.wineSearcherPrice || 0) > 0).length // 시장가 입력된 와인 종 수
   const usedSlots      = new Set(wines.map(w => `${w.cellarId}:${w.slot}`)).size
   const totalSlots     = CELLARS.reduce((s, c) => s + c.slots, 0)
 
@@ -37,8 +44,8 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
   const stats = [
     { label: '총 와인 기록', val: `${wines.length}건`,   sub: '구매 기록 수' },
     { label: '총 보관 병 수', val: `${totalBottles}병`,  sub: `${usedSlots}/${totalSlots} 칸 사용` },
-    { label: '구매가 합계',   val: krw(purchaseValue),   sub: '총 구매금액' },
-    { label: '시장가 합계',   val: krw(marketValue),     sub: '현재 셀러 가치', onClick: () => setTab('stats') },
+    { label: '구매가 합계',   val: krw(purchaseValue),   sub: `구매가 입력 ${pricedCount}종만` },
+    { label: '시장가 합계',   val: krw(marketValue),     sub: `시장가 입력 ${marketCount}종 기준`, onClick: () => setTab('stats') },
     { label: '음주 기록',     val: `${drinkLog.length}번`, sub: '마신 와인', onClick: () => setTab('log') },
   ]
 
@@ -98,12 +105,15 @@ export default function Dashboard({ wines, drinkLog, bottlesIn, setTab, setCella
             <div><div style={{ fontSize:'0.7rem', color:T.muted, marginBottom:4 }}>구매가 합계</div><div style={{ fontSize:'1.1rem', fontWeight:600, color:T.cream }}>{krw(purchaseValue)}</div></div>
             <div style={{ fontSize:'1.2rem', color:T.muted }}>→</div>
             <div><div style={{ fontSize:'0.7rem', color:T.muted, marginBottom:4 }}>현재 시장가 합계</div><div style={{ fontSize:'1.3rem', fontWeight:700, color:T.gold }}>{krw(marketValue)}</div></div>
-            {marketValue > purchaseValue && (
-              <div style={{ background:'#4a8a5e22', border:'1px solid #4a8a5e', borderRadius:8, padding:'6px 12px' }}>
-                <div style={{ fontSize:'0.7rem', color:'#4a8a5e' }}>평가 차익</div>
-                <div style={{ fontSize:'1rem', fontWeight:700, color:'#4a8a5e' }}>+{krw(marketValue - purchaseValue)}</div>
+            {valued.length > 0 && (
+              <div style={{ background:(valuedGain>=0?'#4a8a5e':'#c0392b')+'22', border:`1px solid ${valuedGain>=0?'#4a8a5e':'#c0392b'}`, borderRadius:8, padding:'6px 12px' }}>
+                <div style={{ fontSize:'0.7rem', color:valuedGain>=0?'#4a8a5e':'#c0392b' }}>평가 차익</div>
+                <div style={{ fontSize:'1rem', fontWeight:700, color:valuedGain>=0?'#4a8a5e':'#c0392b' }}>{valuedGain>=0?'+':''}{krw(valuedGain)}</div>
               </div>
             )}
+          </div>
+          <div style={{ fontSize:'0.68rem', color:T.muted, marginTop:10, lineHeight:1.5 }}>
+            ※ 평가 차익은 구매가·시장가가 모두 등록된 {valued.length}종 기준입니다. (구매가 합계·시장가 합계는 전체 와인 기준)
           </div>
         </div>
       )}
