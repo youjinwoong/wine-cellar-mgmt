@@ -128,7 +128,7 @@ export function SearchView({ wines, openDetail, openDrink, goSlot }) {
   )
 }
 
-// 음용 시기 상태 → 목록용 짧은 라벨 (칼럼이 좁으므로 축약, 전체 라벨은 title 툴팁)
+// 음용 시기 상태 → 목록용 짧은 라벨 (칼럼이 좁으므로 축약; 전체 라벨은 title 툴팁으로)
 function drinkShortLabel(s) {
   if (!s) return ''
   if (s.status === 'peak')    return '절정'
